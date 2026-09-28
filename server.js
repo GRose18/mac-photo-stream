@@ -30,12 +30,12 @@ app.post('/upload', upload.single('image'), (req, res) => {
         data: `data:${req.file.mimetype};base64,${base64Image}`
     });
     
-    // Limit memory usage to the last 20 photos
+    // Limit memory usage to the last 20 photos so it doesn't crash
     if (global.photoStreamMemory.length > 20) {
         global.photoStreamMemory.pop();
     }
     
-    console.log(`Saved snapshot to memory at: ${new Date(timestamp).toLocaleTimeString()}`);
+    console.log(`Saved snapshot to memory`);
     res.status(200).send('Upload successful.');
 });
 
