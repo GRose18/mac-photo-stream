@@ -25,13 +25,13 @@
             }
             gallery.innerHTML = images.map(img => `
                 <div class="card">
-                    <img src="/uploads/${img}" alt="Snapshot">
-                    <p>${new Date(parseInt(img.split('_'))).toLocaleString()}</p>
+                    <img src="${img.data}" alt="Snapshot">
+                    <p>${new Date(img.id).toLocaleString()}</p>
                 </div>
             `).join('');
         }
         loadImages();
-        setInterval(loadImages, 10000);
+        setInterval(loadImages, 5000); // Check for new photos every 5 seconds
     </script>
 </body>
 </html>
