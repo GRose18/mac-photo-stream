@@ -13,25 +13,86 @@
 </head>
 <body>
     <h1>Latest Snapshots</h1>
+    <form id="admin-form">
+        <label for="admin-password">Admin password</label>
+        <input id="admin-password" type="password" autocomplete="current-password" placeholder="Required to delete photos">
+        <button type="button" id="clear-password">Clear password</button>
+    </form>
+    <p id="status" role="status" aria-live="polite"></p>
     <div class="gallery" id="gallery">Loading photos...</div>
+    <p><button id="newer" disabled>Newer photos</button> <button id="older" disabled>Older photos</button></p>
     <script>
+        const status = document.getElementById('status');
+        const password = document.getElementById('admin-password');
+        document.getElementById('admin-form').addEventListener('submit', event => event.preventDefault());
+        document.getElementById('clear-password').onclick = () => { password.value = ''; };
+        let loading = false;
+        let deleting = false;
+        let before = null;
+        let next = null;
+        const history = [];
+        let renderedIds = null;
+        let renderedAt = 0;
+        document.getElementById('older').onclick = () => { if (loading || deleting || !next) return; history.push(before); before = next; loadImages(); };
+        document.getElementById('newer').onclick = () => { if (loading || deleting || !history.length) return; before = history.pop(); loadImages(); };
+        async function deletePhoto(id, button) {
+            if (!password.value) { status.textContent = 'Enter your admin password first.'; password.focus(); return; }
+            if (!confirm('Delete this photo from the website? Your Mac’s local copy will remain.')) return;
+            deleting = true;
+            button.disabled = true;
+            try {
+                const res = await fetch(`/api/images/${encodeURIComponent(id)}`, {
+                    method: 'DELETE', headers: { Authorization: `Bearer ${password.value}` }
+                });
+                if (!res.ok) {
+                    const body = await res.json().catch(() => ({}));
+                    throw new Error(body.error || `Delete failed (HTTP ${res.status}).`);
+                }
+                status.textContent = 'Photo deleted.';
+            } catch (error) { status.textContent = error.message; }
+            finally { deleting = false; button.disabled = false; await loadImages(); }
+        }
         async function loadImages() {
-            const res = await fetch('/api/images');
+            if (loading || deleting) return;
+            loading = true;
+            try {
+            const res = await fetch('/api/images' + (before ? `?before=${encodeURIComponent(before)}` : ''));
+            if (!res.ok) throw new Error(`Unable to load photos (HTTP ${res.status}).`);
             const images = await res.json();
+            next = res.headers.get('X-Next-Cursor');
+            document.getElementById('older').disabled = !next;
+            document.getElementById('newer').disabled = !history.length;
+            const ids = JSON.stringify(images.map(image => image.id));
+            // Keep existing image elements until signed links approach expiry.
+            if (ids === renderedIds && Date.now() - renderedAt < 45 * 60 * 1000) return;
+            renderedIds = ids;
+            renderedAt = Date.now();
             const gallery = document.getElementById('gallery');
             if(images.length === 0) {
                 gallery.innerHTML = '<p>No photos uploaded yet.</p>';
                 return;
             }
-            gallery.innerHTML = images.map(img => `
-                <div class="card">
-                    <img src="${img.data}" alt="Snapshot">
-                    <p>${new Date(img.id).toLocaleString()}</p>
-                </div>
-            `).join('');
+            gallery.replaceChildren(...images.map(img => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                const photo = document.createElement('img');
+                photo.src = img.data;
+                photo.loading = 'lazy';
+                photo.alt = 'Snapshot';
+                const date = document.createElement('p');
+                date.textContent = `${img.captured_at ? 'Taken' : 'Uploaded'}: ${new Date(img.captured_at || img.uploaded_at).toLocaleString()}`;
+                date.title = `Uploaded: ${new Date(img.uploaded_at).toLocaleString()}`;
+                const button = document.createElement('button');
+                button.textContent = 'Delete photo';
+                button.onclick = () => deletePhoto(img.id, button);
+                card.append(photo, date, button);
+                return card;
+            }));
+            } catch (error) { status.textContent = error.message; }
+            finally { loading = false; }
         }
         loadImages();
-        setInterval(loadImages, 5000); // Check for new photos every 5 seconds
+        setInterval(() => { if (!document.hidden) loadImages(); }, 30000);
     </script>
 </body>
 </html>

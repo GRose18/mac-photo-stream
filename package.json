@@ -1,17 +1,21 @@
 {
   "name": "mac-photo-stream",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --test",
     "start": "node server.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@supabase/supabase-js": "2.117.2",
     "express": "^5.2.1",
     "multer": "^2.4.0"
   },
-  "description": ""
+  "description": "",
+  "engines": {
+    "node": ">=22 <25"
+  }
 }
