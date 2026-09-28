@@ -2,20 +2,18 @@
 
 Photos are stored in a private Supabase Storage bucket. IDs, file locations, upload timestamps and optional capture timestamps are stored in Postgres. Render restarts do not clear either. There is no automatic retention deletion or 20-photo cap. The public gallery shows 50 photos per page and provides older/newer navigation. Only password-authorized deletion removes a cloud photo; copies on Macs remain.
 
-## Project already provisioned
+## Target project
 
-- Name: Mac Photo Stream
-- Project ref: `oonjtysmqptgcgqkftwr`
-- Organization: The Powerwashing Pros (Free plan)
+- Project ref: `ghhgjogizbwzfyojxphy`
 - Bucket: `photo-stream` (private)
 - Table: `public.photos` (RLS enabled; only service_role has access)
-- Migration: `supabase/migrations/20260928190523_durable_photo_storage.sql`
+- Apply this migration to the new project before deploying: `supabase/migrations/20260928190523_durable_photo_storage.sql`
 
 ## Connect Render before deploying
 
 In the existing service's Environment settings, set:
 
-- `SUPABASE_URL`: `https://oonjtysmqptgcgqkftwr.supabase.co`
+- `SUPABASE_URL`: `https://ghhgjogizbwzfyojxphy.supabase.co`
 - `SUPABASE_SECRET_KEY`: a server-side secret key from Supabase Project Settings > API Keys. A legacy service_role key also works. Never use this key in the browser or commit it.
 - `ADMIN_PASSWORD`: your private password for deleting photos.
 
