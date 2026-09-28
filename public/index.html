@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Photo Stream</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; background: #f4f4f9; padding: 20px; }
+        .gallery { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; margin-top: 20px; }
+        .card { background: white; padding: 10px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        img { max-width: 300px; border-radius: 4px; display: block; }
+    </style>
+</head>
+<body>
+    <h1>Latest Snapshots</h1>
+    <div class="gallery" id="gallery">Loading photos...</div>
+    <script>
+        async function loadImages() {
+            const res = await fetch('/api/images');
+            const images = await res.json();
+            const gallery = document.getElementById('gallery');
+            if(images.length === 0) {
+                gallery.innerHTML = '<p>No photos uploaded yet.</p>';
+                return;
+            }
+            gallery.innerHTML = images.map(img => `
+                <div class="card">
+                    <img src="/uploads/${img}" alt="Snapshot">
+                    <p>${new Date(parseInt(img.split('_'))).toLocaleString()}</p>
+                </div>
+            `).join('');
+        }
+        loadImages();
+        setInterval(loadImages, 10000);
+    </script>
+</body>
+</html>
