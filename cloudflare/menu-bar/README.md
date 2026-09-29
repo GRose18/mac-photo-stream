@@ -1,70 +1,89 @@
-# Photo Stream menu-bar app
+# Sclshi menu-bar app
 
-For macOS 13 or newer, on Apple silicon or Intel. Runs in the menu bar with no
-Dock icon, main window, or Terminal window. Uses AVFoundation directly under its
-own camera permission; ImageSnap is not used by this app. The normal macOS camera
-indicator remains active during captures. Python 3 handles authenticated uploads
-through the bundled, existing uploader. No new Python packages are required.
+For macOS 13 or newer, Apple silicon or Intel. Sclshi shows a `$` in the menu
+bar, with **Quit** as its only menu option. No Terminal window or Dock icon is
+needed. It takes a photo approximately every 60 seconds while running and awake,
+then uploads it to your private site. Normal macOS camera permission and the
+camera indicator remain enabled. Hover over `$` for the current capture status.
 
-## Install on the Mac that takes photos
+## First installation on another Mac
 
-Install Python 3 and Apple's Command Line Tools if missing (`brew install python`
-and `xcode-select --install`). Update the repository, then run:
+1. Install Apple's Command Line Tools if missing:
 
-```sh
-cd ~/mac-photo-stream
-git switch codex/durable-photo-storage
-git pull --ff-only
-cd cloudflare/menu-bar
-bash install.sh
-open "$HOME/Applications/Photo Stream.app"
-```
+   ```sh
+   xcode-select --install
+   ```
 
-The installer builds locally, verifies the ad-hoc signature, copies the app to
-~/Applications, and backs up/disables the two earlier Photo Stream LaunchAgents.
-It does not start the camera. The final `open` command starts the app.
-Before opening it, stop any old Terminal capture loop with Ctrl-C and remove
-Photo Stream.command from System Settings > General > Login Items & Extensions.
+   Finish the installer before continuing. An “already installed” message is fine.
+   Python 3 is required; if `python3 --version` fails, install Python 3 before continuing
+   (with Homebrew already installed, use `brew install python`). No Python packages
+   or ImageSnap installation are needed for this app.
 
-Approve the **Photo Stream** camera prompt once. Terminal's permission is not
-used. If permission is denied, use the app's Camera Settings menu item and enable
-Photo Stream. The app registers itself with Apple's supported login-item API.
-Check that **Start at Login** has a checkmark; if macOS requires approval, click
-that item to open Login Items settings and allow it. Registration and permissions
-must be completed on each Mac. Keep the installed app at the same location.
+2. Download the source into a new folder:
 
-The existing owner-readable ~/Pictures/PhotoStream/config.json supplies the saved
-upload token automatically. If missing, a secure-text prompt asks for the token
-once. No credentials are embedded in the app, source, or Git.
+   ```sh
+   git clone --branch codex/durable-photo-storage https://github.com/GRose18/mac-photo-stream.git "$HOME/sclshi-source"
+   cd "$HOME/sclshi-source/cloudflare/menu-bar"
+   bash install.sh
+   ```
 
-## Use
+   If that clone already exists, update it instead:
 
-- Capture is scheduled approximately every 60 seconds while awake and logged in.
-- Pause prevents new captures; an operation already in progress may finish.
-- Resume starts capture again. The paused state persists across app relaunches.
-- Quit stops the app. Disable Start at Login as well to stop future login starts.
-- A busy upload skips overlapping capture ticks. Sleep does not create catch-up
-  captures, and there is no capture while logged out.
-- Originals and resized JPEGs remain in Pictures/PhotoStream. Existing queue
-  receipts and cloud quota guards are reused; nothing is automatically deleted.
-- At 2 GB local data or less than 1 GB free disk space, capture pauses and queued
-  uploads may continue. The cloud's 800 MB storage cutoff remains unchanged.
-- app-status.txt records the most recent status without tokens or image data.
+   ```sh
+   cd "$HOME/sclshi-source"
+   git pull --ff-only
+   cd cloudflare/menu-bar
+   bash install.sh
+   ```
 
-## Build and inspect without camera access
+3. Stop any old Terminal capture loop with Ctrl-C and remove Photo Stream.command
+   from System Settings > General > Login Items. Quit an existing Photo Stream or
+   Sclshi app before updating. The installer backs up prior app bundles and disables
+   the two earlier Photo Stream LaunchAgents. Existing photos and configuration stay.
+
+4. Start Sclshi:
+
+   ```sh
+   open "$HOME/Applications/Sclshi.app"
+   ```
+
+   Enter the upload token once if prompted, and approve Sclshi's camera request.
+   The saved token in `~/Pictures/PhotoStream/config.json` is reused on future
+   launches. Tokens are never embedded in Git or the app. If setup is cancelled,
+   quit and reopen to try again. Camera permission can be enabled in System
+   Settings > Privacy & Security > Camera.
+
+5. Check System Settings > General > Login Items and make sure Sclshi is enabled.
+   The app requests registration automatically on first launch. If automatic
+   startup was previously disabled for Photo Stream, enable/add Sclshi there.
+   Keep the installed app in `~/Applications`.
+
+## Startup and stopping
+
+- Logout stops the app. The next login starts it when its login item is enabled.
+- Quit stops capture and uploads; it does not immediately restart. Reopen manually
+  or log in again to restart. Disable its login item to prevent future login starts.
+- Sleep pauses work. Wake resumes the timer; missed minutes are not caught up.
+  A busy upload skips overlapping capture ticks. A locked but awake session can
+  continue running; locking is different from logging out.
+- Originals, resized JPEGs, and queued uploads stay in `~/Pictures/PhotoStream`.
+  Nothing is automatically deleted. At 2 GB local data or less than 1 GB disk
+  space, new captures stop; queued uploads may continue. The cloud's 800 MB
+  storage cutoff and existing free-tier guards remain unchanged.
+- Latest status: `cat "$HOME/Pictures/PhotoStream/app-status.txt"`.
+
+## Build without starting capture
 
 ```sh
 bash build.sh
-open -n "build/Photo Stream.app" --args --preview
 ```
 
-Preview mode cannot access the camera, upload, write user configuration, or
-register a login item. Quit the preview before launching the installed real app.
-The resulting build/Photo Stream.zip contains a universal macOS app. It is
-ad-hoc signed, not Developer ID signed or notarized. Building locally avoids
-claiming that a downloaded app is Apple-notarized. If macOS presents a security
-approval, the owner must review and approve it themselves.
+This creates `build/Sclshi.app` and `build/Sclshi.zip`, universal Intel/Apple silicon
+builds. It does not install, start capture, or register a login item.
+For a camera-disabled preview, use `open -n "build/Sclshi.app" --args --preview`.
+Preview also disables uploads, configuration writes, and login registration.
 
-If the installed SDK and Swift compiler are mismatched, select a compatible
-installed SDK with PHOTO_STREAM_SDK=/path/to/MacOSX.sdk before running build.sh
-or install.sh. Do not disable macOS security to resolve a build problem.
+The app is ad-hoc signed, not Developer ID signed or notarized. Review any macOS
+security approval yourself. Do not disable macOS security. If the installed SDK
+and compiler mismatch, select a compatible installed SDK with
+`PHOTO_STREAM_SDK=/path/to/MacOSX.sdk bash build.sh`.

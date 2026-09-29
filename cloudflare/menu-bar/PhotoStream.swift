@@ -6,7 +6,7 @@ import CryptoKit
 import Darwin
 
 @main
-final class PhotoStream: NSObject, NSApplicationDelegate, AVCapturePhotoCaptureDelegate, NSMenuItemValidation {
+final class PhotoStream: NSObject, NSApplicationDelegate, AVCapturePhotoCaptureDelegate {
     static func main() {
         let app = NSApplication.shared
         let delegate = PhotoStream()
@@ -18,9 +18,6 @@ final class PhotoStream: NSObject, NSApplicationDelegate, AVCapturePhotoCaptureD
     let queue = DispatchQueue(label: "com.gaberose.photostream.capture")
     let preview = CommandLine.arguments.contains("--preview") || Bundle.main.object(forInfoDictionaryKey: "PhotoStreamPreview") as? Bool == true
     var status: NSStatusItem!
-    var info: NSMenuItem!
-    var pauseItem: NSMenuItem!
-    var loginItem: NSMenuItem!
     var timer: Timer?
     var session: AVCaptureSession?
     var output: AVCapturePhotoOutput?
@@ -30,14 +27,8 @@ final class PhotoStream: NSObject, NSApplicationDelegate, AVCapturePhotoCaptureD
     var lockFD: Int32 = -1
     var activeCapture: UUID?
 
-    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
-        if menuItem.action == #selector(tick) { return !paused && !busy && !preview }
-        if menuItem.action == #selector(toggleLogin) { return !preview }
-        return true
-    }
-
     func report(_ text: String) {
-        DispatchQueue.main.async { self.info.title = text; self.status.button?.toolTip = text }
+        DispatchQueue.main.async { self.status.button?.toolTip = "Sclshi · photo capture every 60 seconds · \(text)" }
         guard !preview else { return }
         try? "\(Date()): \(text)\n".write(to: root.appendingPathComponent("app-status.txt"), atomically: true, encoding: .utf8)
     }
@@ -52,34 +43,24 @@ final class PhotoStream: NSObject, NSApplicationDelegate, AVCapturePhotoCaptureD
             lockFD = open(root.appendingPathComponent("menu-app.lock").path, O_CREAT | O_RDWR, 0o600)
             guard lockFD >= 0, flock(lockFD, LOCK_EX | LOCK_NB) == 0 else { NSApp.terminate(nil); return }
         }
-        paused = preview || UserDefaults.standard.bool(forKey: "paused")
+        paused = preview
         status = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        status.button?.image = NSImage(systemSymbolName: "camera", accessibilityDescription: "Photo Stream")
+        status.button?.title = "$"
+        status.button?.setAccessibilityLabel("Sclshi photo capture")
         let menu = NSMenu()
-        _ = item("Photo Stream · every 60 seconds", nil, menu)
-        info = item("Starting…", nil, menu)
-        menu.addItem(.separator())
-        pauseItem = item(paused ? "Resume" : "Pause", #selector(togglePause), menu)
-        _ = item("Take Photo Now", #selector(tick), menu)
-        loginItem = item("Start at Login", #selector(toggleLogin), menu)
-        menu.addItem(.separator())
-        _ = item("Open Website", #selector(website), menu)
-        _ = item("Open Local Photos", #selector(photos), menu)
-        _ = item("Camera Settings", #selector(cameraSettings), menu)
-        _ = item("Quit Photo Stream", #selector(quit), menu)
+        _ = item("Quit", #selector(quit), menu)
         status.menu = menu
         if preview { report("Preview — camera and uploads disabled"); return }
         if !FileManager.default.fileExists(atPath: root.appendingPathComponent("config.json").path) { configure() }
         if !UserDefaults.standard.bool(forKey: "loginOff") { enableLogin() }
-        updateLogin()
         timer = Timer.scheduledTimer(timeInterval: 60, target: self, selector: #selector(tick), userInfo: nil, repeats: true)
-        if paused { report("Paused") } else { tick() }
+        if paused { report("Setup incomplete — quit and reopen to enter your token") } else { tick() }
     }
     func configure() {
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
-        alert.messageText = "Connect Photo Stream"
-        alert.informativeText = "Enter your upload token once. Photos are captured every 60 seconds while running and awake. Use the menu-bar icon to pause or quit."
+        alert.messageText = "Connect Sclshi"
+        alert.informativeText = "Enter your upload token once. Photos are captured every 60 seconds while running and awake. Use the $ menu-bar icon to quit. Sclshi also starts at login."
         let field = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 360, height: 24))
         alert.accessoryView = field; alert.addButton(withTitle: "Save"); alert.addButton(withTitle: "Cancel")
         if alert.runModal() == .alertFirstButtonReturn && !field.stringValue.isEmpty {
@@ -87,32 +68,10 @@ final class PhotoStream: NSObject, NSApplicationDelegate, AVCapturePhotoCaptureD
             do { try JSONSerialization.data(withJSONObject: config).write(to: root.appendingPathComponent("config.json"), options: .atomic) }
             catch { report("Could not save configuration"); paused = true }
         } else { paused = true }
-        pauseItem.title = paused ? "Resume" : "Pause"
     }
     func enableLogin() {
         do { try SMAppService.mainApp.register() } catch { report("Login setup needs attention in System Settings") }
     }
-    func updateLogin() { loginItem.state = SMAppService.mainApp.status == .enabled ? .on : .off }
-    @objc func toggleLogin() {
-        guard !preview else { return }
-        do {
-            if SMAppService.mainApp.status == .enabled {
-                try SMAppService.mainApp.unregister(); UserDefaults.standard.set(true, forKey: "loginOff")
-            } else { UserDefaults.standard.set(false, forKey: "loginOff"); enableLogin() }
-            updateLogin()
-            if SMAppService.mainApp.status == .requiresApproval { SMAppService.openSystemSettingsLoginItems() }
-        } catch { report("Could not change login setting") }
-    }
-    @objc func togglePause() {
-        paused.toggle(); pauseItem.title = paused ? "Resume" : "Pause"
-        status.button?.image = NSImage(systemSymbolName: paused ? "pause.circle" : "camera", accessibilityDescription: "Photo Stream")
-        if !preview { UserDefaults.standard.set(paused, forKey: "paused") }
-        report(paused ? "Paused — current operation may finish" : "Running — every 60 seconds")
-        if !paused { tick() }
-    }
-    @objc func website() { NSWorkspace.shared.open(URL(string: "https://mac-photo-stream.photo-stream-cloudflare-draft.workers.dev")!) }
-    @objc func photos() { NSWorkspace.shared.open(root) }
-    @objc func cameraSettings() { NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera")!) }
     @objc func quit() { NSApp.terminate(nil) }
     func finish(_ text: String) {
         session?.stopRunning(); session = nil; output = nil; activeCapture = nil
@@ -128,7 +87,7 @@ final class PhotoStream: NSObject, NSApplicationDelegate, AVCapturePhotoCaptureD
                 DispatchQueue.main.async { self.busy = false; if granted { self.tick() } else { self.report("Camera denied — open Camera Settings") } }
             }
         case .authorized: queue.async { self.capture() }
-        default: busy = false; report("Allow Photo Stream in Camera Settings")
+        default: busy = false; report("Allow Sclshi in System Settings > Privacy & Security > Camera")
         }
     }
     func capture() {
