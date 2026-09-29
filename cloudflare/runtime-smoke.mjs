@@ -36,5 +36,14 @@ try{
  r=await action('/api/game/pack',{},member);assert.equal(r.status,201,await r.clone().text());assert.equal((await r.json()).card.serial,1);
  r=await mf.dispatchFetch('https://test/api/game/card-image/'+cardId,{headers:member});assert.equal(r.status,200);
  r=await mf.dispatchFetch('https://test/api/images/'+cardId,{headers:member});assert.equal(r.status,401);
- console.log('Cloudflare runtime smoke passed: uploads, quotas, invitations, password hashing, cookies, daily rewards, mythic issuance, and image access.');
+ r=await action('/api/game/admin/invites',{label:'Trade test'},auth);const secondInvite=await r.json();
+ r=await action('/api/auth/signup',{username:'runtime_trader',password:'runtime-test-password',invite:secondInvite.token});assert.equal(r.status,201);
+ const second={Cookie:r.headers.get('Set-Cookie').split(';')[0]},commonId='00000000-0000-4000-8000-000000000003';
+ r=await mf.dispatchFetch('https://test/upload',{method:'POST',headers:{...headers,'X-Photo-ID':commonId},body:new Uint8Array([255,216,255,217])});assert.equal(r.status,201);
+ r=await action('/api/game/admin/cards',{id:commonId,title:'Trade common',rarity:'common'},auth);assert.equal(r.status,201);
+ r=await action('/api/game/pack',{},second);assert.equal(r.status,201);assert.equal((await r.json()).card.id,commonId);
+ r=await action('/api/game/trades',{give:cardId,want:commonId},member);assert.equal(r.status,201);const trade=(await r.json()).offer;
+ r=await action('/api/game/trades/'+trade.id+'/accept',{},second);assert.equal(r.status,200,await r.clone().text());
+ r=await mf.dispatchFetch('https://test/api/game/collection',{headers:second});const afterTrade=await r.json();assert.equal(afterTrade.cards.length,1);assert.equal(afterTrade.cards[0].id,cardId);assert.equal(afterTrade.cards[0].rarity,'mythic');
+ console.log('Cloudflare runtime smoke passed: uploads, quotas, signup, rewards, privacy, and an atomic mythic trade.');
 }finally{await mf.dispose();}

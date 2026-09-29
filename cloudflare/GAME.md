@@ -58,7 +58,7 @@ Secrets never enter client HTML or Git. Do not share the upload token with playe
 No paid services/plans are enabled. Existing 800 MB / 40,000-photo storage,
 2,000 daily photo writes, 10,000 photo reads, and 60 MB daily transfer guards stay.
 The game also stops at 100 members, 500 card designs, 200 pending invitations,
-5,000 daily game API requests, and 500 daily authentication attempts. Per-IP hash
+2,500 daily game API requests, and 500 daily authentication attempts. Per-IP hash
 buckets cap attempts at 15 per 15 minutes (shared networks can share a bucket).
 The bounded catalog and request limit constrain ledger reads and writes; actual
 provider quotas are account-wide and can still be reached by other applications.
@@ -83,3 +83,20 @@ idempotency, coin persistence, and retirement. Runtime smoke uses a local
 Cloudflare emulator and fake storage; it never uploads test cards to production.
 Browser checks use local synthetic images and accounts. Both camera upload
 clients and existing private photos require no migration.
+
+## Trading
+
+Players can post one-card-for-one-card offers in Trading. Posting an offer is
+permission for any member who owns the requested card to accept it. Acceptance
+shows an explicit confirmation and atomically swaps one copy of each card.
+Copies remain in their owners' collections until acceptance; no escrow or coins
+are involved. Ownership and account status are checked again when accepting.
+Only the maker can cancel an open offer. Competing acceptance requests and retries
+cannot duplicate a card, including a mythic. Retired collectible cards may trade.
+
+The board shows offered card images to signed-in members; the rest of a player's
+collection remains private. Approved card titles/rarities are listed as request
+choices. Limits: five open offers per member, 100 open offers total, and the most
+recent 100 closed offers retained globally. Old trade history is pruned; owned
+cards and coin balances are never pruned. Non-mythic cards use copy counts rather
+than promising individually tracked serial numbers.

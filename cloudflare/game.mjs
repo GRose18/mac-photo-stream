@@ -1,4 +1,5 @@
 import { HttpError } from './budget.mjs';
+import { handleTrading } from './trading.mjs';
 
 const enc = new TextEncoder();
 const reply = (data, status = 200, headers = {}) => Response.json(data, {status, headers: {'Cache-Control':'no-store', ...headers}});
@@ -7,7 +8,7 @@ export const hash = async s => hex(await crypto.subtle.digest('SHA-256', enc.enc
 const randomToken = () => hex(crypto.getRandomValues(new Uint8Array(32)));
 export const RARITIES = {common:75, rare:18, epic:6, mythic:1};
 export const WHEEL = [10,25,15,50,10,100,20,250];
-export const GAME_LIMITS = {members:100, cards:500, invitations:200, requestsPerDay:5000, authPerDay:500};
+export const GAME_LIMITS = {members:100, cards:500, invitations:200, requestsPerDay:2500, authPerDay:500};
 const DAY = 86400000;
 const cookieName = '__Host-sclshi';
 const cookie = (v, age=604800) => `${cookieName}=${v}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=${age}`;
@@ -113,13 +114,15 @@ export async function handleGame(gallery, request) {
   user=await store.get('game:user:'+identity.id);
   if(!user||user.disabled||user.version!==identity.version)throw new HttpError(401,'Please sign in again.');
  }
+ const tradeResponse = await handleTrading(gallery,request,identity,user,body);
+ if(tradeResponse)return tradeResponse;
  const admin=identity.role==='admin';
  if(path.startsWith('/api/game/admin/')&&!admin)throw new HttpError(403,'Admin access required.');
  if(path==='/api/game/me'&&request.method==='GET'){
   const cards=[...(await store.list({prefix:'game:card:',limit:GAME_LIMITS.cards})).values()];
   const available=cards.filter(c=>c.active&&(c.rarity!=='mythic'||!c.minted));
   const groups=Object.entries(RARITIES).filter(([r])=>available.some(c=>c.rarity===r));const sum=groups.reduce((s,[,w])=>s+w,0);
-  return reply({username:identity.id,role:identity.role,coins:user?.coins||0,pack:user?.lastPack?.day===day?user.lastPack:null,spin:user?.lastSpin?.day===day?user.lastSpin:null,available:available.length,odds:groups.map(([rarity,w])=>({rarity,percent:100*w/sum})),wheel:WHEEL,reset_at:new Date(Date.parse(day)+DAY).toISOString(),limits:admin?GAME_LIMITS:undefined});
+  return reply({username:identity.id,role:identity.role,coins:user?.coins||0,packOwned:!!(user?.lastPack && await store.get('game:owned:'+user.id+':'+user.lastPack.card.id)),pack:user?.lastPack?.day===day?user.lastPack:null,spin:user?.lastSpin?.day===day?user.lastSpin:null,available:available.length,odds:groups.map(([rarity,w])=>({rarity,percent:100*w/sum})),wheel:WHEEL,reset_at:new Date(Date.parse(day)+DAY).toISOString(),limits:admin?GAME_LIMITS:undefined});
  }
  if(path==='/api/game/admin/invites'){
   if(request.method==='GET')return reply({invites:[...(await store.list({prefix:'game:invite:',limit:GAME_LIMITS.invitations})).entries()].map(([key,v])=>({id:key.slice(12),...v}))});

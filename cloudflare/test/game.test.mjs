@@ -49,3 +49,52 @@ test('recreating the worker object preserves ownership and balances',async()=>{c
 test('revoked invitations cannot enroll',async()=>{const f=fixture(),i=await(await game(f,'/api/game/admin/invites',{},adminHeaders)).json();await game(f,'/api/game/admin/revoke',{id:i.id},adminHeaders);assert.equal((await game(f,'/api/auth/signup',{username:'alice',password:'a-strong-test-password',invite:i.token})).status,403);});
 
 test('member and signed-out cookies override browser-cached Basic admin credentials',async()=>{const f=fixture(),c=await join(f);const member=await(await game(f,'/api/game/me',undefined,{...adminHeaders,...c})).json();assert.equal(member.role,'member');const logout=await game(f,'/api/auth/logout',{},c);const out={Cookie:logout.headers.get('Set-Cookie').split(';')[0]};assert.equal((await game(f,'/api/game/me',undefined,{...adminHeaders,...out})).status,401);assert.equal((await f.call(new Request('https://example.test/api/images',{headers:{...adminHeaders,...c}}))).status,401);});
+async function give(f,username,n,count=1,rarity='common'){
+ if(!await f.storage.get('game:card:'+id(n)))await publish(f,n,rarity);
+ const c=await f.storage.get('game:card:'+id(n));c.minted+=count;await f.storage.put('game:card:'+id(n),c);
+ await f.storage.put('game:owned:'+username+':'+id(n),{id:id(n),count,serial:1,acquired_at:new Date().toISOString()});
+}
+async function offer(f,cookie,a=1,b=2){const r=await game(f,'/api/game/trades',{give:id(a),want:id(b)},cookie);assert.equal(r.status,201,await r.clone().text());return(await r.json()).offer;}
+test('trade swaps exactly one copy and preserves mythic uniqueness; retries are harmless',async()=>{
+ const f=fixture(),a=await join(f,'alice'),b=await join(f,'bobby');await give(f,'alice',1,2);await give(f,'bobby',2,1,'mythic');const t=await offer(f,a);
+ const r=await game(f,'/api/game/trades/'+t.id+'/accept',{},b);assert.equal(r.status,200);
+ assert.equal((await f.storage.get('game:owned:alice:'+id(1))).count,1);
+ assert.equal((await f.storage.get('game:owned:alice:'+id(2))).count,1);
+ assert.equal((await f.storage.get('game:owned:bobby:'+id(1))).count,1);
+ assert.equal(await f.storage.get('game:owned:bobby:'+id(2)),undefined);
+ assert.equal((await f.storage.get('game:card:'+id(2))).minted,1);
+ assert.equal((await game(f,'/api/game/trades/'+t.id+'/accept',{},b)).status,200);
+ assert.equal((await f.storage.get('game:owned:alice:'+id(1))).count,1);
+});
+test('simultaneous trade acceptances cannot spend a card twice',async()=>{
+ const f=fixture(),a=await join(f,'alice'),b=await join(f,'bobby'),c=await join(f,'carol');await give(f,'alice',1,1,'mythic');await give(f,'bobby',2);await give(f,'carol',2);const t=await offer(f,a);
+ const rs=await Promise.all([game(f,'/api/game/trades/'+t.id+'/accept',{},b),game(f,'/api/game/trades/'+t.id+'/accept',{},c)]);assert.deepEqual(rs.map(r=>r.status).sort(),[200,409]);
+ const owners=[...(await f.storage.list({prefix:'game:owned:',limit:100})).values()].filter(c=>c.id===id(1));assert.equal(owners.length,1);assert.equal(owners[0].count,1);
+});
+test('offers require ownership; only maker can cancel; cannot accept own offer',async()=>{
+ const f=fixture(),a=await join(f,'alice'),b=await join(f,'bobby');await give(f,'alice',1);await give(f,'bobby',2);
+ assert.equal((await game(f,'/api/game/trades',{give:id(1),want:id(2)},b)).status,409);const t=await offer(f,a);
+ assert.equal((await game(f,'/api/game/trades/'+t.id+'/cancel',{},b)).status,403);
+ assert.equal((await game(f,'/api/game/trades/'+t.id+'/accept',{},a)).status,403);
+ assert.equal((await game(f,'/api/game/trades/'+t.id+'/cancel',{},a)).status,200);
+ assert.equal((await game(f,'/api/game/trades/'+t.id+'/accept',{},b)).status,409);
+});
+test('trade transaction rolls back both transfers on storage failure',async()=>{
+ const f=fixture(),a=await join(f,'alice'),b=await join(f,'bobby');await give(f,'alice',1);await give(f,'bobby',2);const t=await offer(f,a);
+ const original=f.storage.put.bind(f.storage);f.storage.put=async(k,v)=>{if(k==='game:owned:alice:'+id(2))throw Error('simulated failure');return original(k,v);};
+ assert.equal((await game(f,'/api/game/trades/'+t.id+'/accept',{},b)).status,503);
+ assert.equal((await f.storage.get('game:owned:alice:'+id(1))).count,1);assert.equal((await f.storage.get('game:owned:bobby:'+id(2))).count,1);
+ assert.equal(await f.storage.get('game:owned:bobby:'+id(1)),undefined);assert.equal((await f.storage.get('game:trades'))[t.id].status,'open');
+});
+test('offered image is member-visible without exposing other private photos',async()=>{
+ const f=fixture(),a=await join(f,'alice'),b=await join(f,'bobby');await give(f,'alice',1);await publish(f,2);const t=await offer(f,a);
+ assert.equal((await game(f,'/api/game/trade-image/'+t.id)).status,401);
+ assert.equal((await game(f,'/api/game/trade-image/'+t.id,undefined,b)).status,200);
+ assert.equal((await game(f,'/api/game/card-image/'+id(2),undefined,b)).status,404);
+ await game(f,'/api/game/trades/'+t.id+'/cancel',{},a);
+ assert.equal((await game(f,'/api/game/trade-image/'+t.id,undefined,b)).status,404);
+});
+test('trading away the last copy closes conflicting offers',async()=>{
+ const f=fixture(),a=await join(f,'alice'),b=await join(f,'bobby');await give(f,'alice',1);await give(f,'bobby',2);await publish(f,3);const first=await offer(f,a),second=await offer(f,a,1,3);
+ await game(f,'/api/game/trades/'+first.id+'/accept',{},b);assert.equal((await f.storage.get('game:trades'))[second.id].status,'unavailable');
+});
