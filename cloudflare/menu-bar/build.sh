@@ -18,7 +18,7 @@ cp ../photo_upload.py "$APP/Contents/Resources/photo_upload.py"
 import plistlib,sys
 from pathlib import Path
 app=Path(sys.argv[1])
-data={'CFBundleDisplayName':'Sclshi','CFBundleName':'Sclshi','CFBundleExecutable':'Sclshi','CFBundleIdentifier':'com.gaberose.photostream.menubar','CFBundlePackageType':'APPL','CFBundleVersion':'3','CFBundleShortVersionString':'3.0','LSMinimumSystemVersion':'13.0','LSUIElement':True,'NSCameraUsageDescription':'Sclshi takes a photo every 60 seconds while running and awake, then uploads it to your private photo website. Quit from the $ menu-bar icon.'}
+data={'CFBundleDisplayName':'Sclshi','CFBundleName':'Sclshi','CFBundleExecutable':'Sclshi','CFBundleIdentifier':'com.gaberose.photostream.menubar','CFBundlePackageType':'APPL','CFBundleVersion':'3','CFBundleShortVersionString':'3.0','LSMinimumSystemVersion':'13.0','LSUIElement':True,'NSCameraUsageDescription':'Welcome to Sclshi!'}
 with (app/'Contents/Info.plist').open('wb') as f:plistlib.dump(data,f)
 PY
 codesign --force --sign - "$APP"
