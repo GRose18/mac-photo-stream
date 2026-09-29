@@ -23,5 +23,18 @@ try{
  r=await mf.dispatchFetch('https://test'+list.images[0].data,{headers:auth});assert.equal(r.status,200);assert.equal((await r.arrayBuffer()).byteLength,4);
  r=await mf.dispatchFetch('https://test'+list.images[0].data,{method:'DELETE',headers:{...auth,'X-Photo-Action':'delete'}});assert.equal(r.status,204);
  r=await mf.dispatchFetch('https://test/api/usage',{headers:auth});assert.equal((await r.json()).totals.bytes,0);
- console.log('Cloudflare runtime smoke passed: upload, retry, list, download, delete, quota release.');
+ const action = (path, data, extra={}) => mf.dispatchFetch('https://test'+path,{method:'POST',headers:{'Content-Type':'application/json','X-Sclshi-Action':'1',...extra},body:JSON.stringify(data)});
+ r=await action('/api/game/admin/invites',{label:'Runtime test'},auth);assert.equal(r.status,201,await r.clone().text());const invitation=await r.json();
+ r=await action('/api/auth/signup',{username:'runtime_player',password:'runtime-test-password',invite:invitation.token});assert.equal(r.status,201,await r.clone().text());
+ const member={Cookie:r.headers.get('Set-Cookie').split(';')[0]};
+ r=await mf.dispatchFetch('https://test/api/game/me',{headers:member});assert.equal(r.status,200);assert.equal((await r.json()).role,'member');
+ r=await action('/api/game/spin',{},member);assert.equal(r.status,201);const spin=await r.json();
+ r=await action('/api/game/spin',{},member);assert.equal(r.status,200);assert.equal((await r.json()).balance,spin.balance);
+ const cardId='00000000-0000-4000-8000-000000000002';
+ r=await mf.dispatchFetch('https://test/upload',{method:'POST',headers:{...headers,'X-Photo-ID':cardId},body:new Uint8Array([255,216,255,217])});assert.equal(r.status,201);
+ r=await action('/api/game/admin/cards',{id:cardId,title:'Runtime mythic',rarity:'mythic'},auth);assert.equal(r.status,201);
+ r=await action('/api/game/pack',{},member);assert.equal(r.status,201,await r.clone().text());assert.equal((await r.json()).card.serial,1);
+ r=await mf.dispatchFetch('https://test/api/game/card-image/'+cardId,{headers:member});assert.equal(r.status,200);
+ r=await mf.dispatchFetch('https://test/api/images/'+cardId,{headers:member});assert.equal(r.status,401);
+ console.log('Cloudflare runtime smoke passed: uploads, quotas, invitations, password hashing, cookies, daily rewards, mythic issuance, and image access.');
 }finally{await mf.dispose();}

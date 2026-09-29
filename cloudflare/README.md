@@ -1,3 +1,10 @@
+## Sclshi card game
+
+The website now includes invite-only accounts, admin photo approval, daily packs,
+one-of-one mythics, a daily coin wheel, and private collections. See [GAME.md](GAME.md)
+for admin setup, game rules, privacy, and free-plan limits. Camera uploads continue
+to use the existing endpoint and token.
+
 # Photo Stream — Cloudflare Workers Free + Supabase Free
 
 Live site: https://mac-photo-stream.photo-stream-cloudflare-draft.workers.dev

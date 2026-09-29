@@ -1,5 +1,7 @@
 import { charge, reserve, LIMITS, HttpError } from './budget.mjs';
-import { HTML } from './page.mjs';
+import { HTML as LEGACY_HTML } from './page.mjs';
+import { HTML } from './game-page.mjs';
+import { handleGame, readSession, hash } from './game.mjs';
 import { createPhotoStore } from './supabase-storage.mjs';
 
 const json = (value, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store' } });
@@ -39,6 +41,11 @@ export default {
       if (!env.ADMIN_PASSWORD || !env.UPLOAD_TOKEN) return json({ error: 'Service is not configured.' }, 503);
       if (env.FREE_PLAN_SETUP_VERIFIED !== 'true') return json({ error: 'Free-plan and storage setup must be verified before enabling this service.' }, 503);
       const url = new URL(request.url);
+      if (request.method === 'GET' && ['/', '/join'].includes(url.pathname)) return new Response(HTML, {headers: {
+        'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','Referrer-Policy':'no-referrer',
+        'X-Content-Type-Options':'nosniff',
+        'Content-Security-Policy': "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'none'"
+      }});
       const upload = request.method === 'POST' && url.pathname === '/upload';
       const authorization = request.headers.get('Authorization') || '';
       let allowed = false;
@@ -46,10 +53,23 @@ export default {
       else if (authorization.startsWith('Basic ')) {
         try { allowed = await same(atob(authorization.slice(6)), `admin:${env.ADMIN_PASSWORD}`); } catch {}
       }
+      if (!upload && !allowed) allowed = (await readSession(request, env))?.role === 'admin';
+      const game = url.pathname.startsWith('/api/game/') || url.pathname.startsWith('/api/auth/');
+      if (game) {
+        if (!['GET','POST'].includes(request.method)) return json({error:'Method not allowed.'},405);
+        if (request.method === 'POST' && (request.headers.get('X-Sclshi-Action') !== '1' ||
+            (request.headers.get('Origin') && request.headers.get('Origin') !== url.origin)))
+          return json({error:'Same-origin action required.'},403);
+        const headers = new Headers({'Content-Type':request.headers.get('Content-Type')||'',
+          'Cookie':request.headers.get('Cookie')||'', 'X-Verified-Admin':allowed?'yes':'no',
+          'X-Client-Hash':await hash((request.headers.get('CF-Connecting-IP')||'local') + env.ADMIN_PASSWORD)});
+        const stub = env.GALLERY.get(env.GALLERY.idFromName('supabase-gallery-v1'));
+        return stub.fetch(new Request('https://internal'+url.pathname+url.search, {method:request.method,headers,body:request.body,duplex:'half'}));
+      }
       if (!allowed) return new Response('Authentication required', { status: 401, headers: {
         'WWW-Authenticate': 'Basic realm="Private Photo Stream"', 'Cache-Control': 'no-store'
       } });
-      if (request.method === 'GET' && url.pathname === '/') return new Response(HTML, { headers: {
+      if (request.method === 'GET' && url.pathname === '/legacy') return new Response(LEGACY_HTML, { headers: {
         'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store',
         'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer',
         'Content-Security-Policy': "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'"
@@ -73,6 +93,7 @@ export default {
       if (match && validId(match[1]) && ['GET', 'DELETE'].includes(request.method)) {
         if (request.method === 'DELETE' && request.headers.get('X-Photo-Action') !== 'delete')
           throw new HttpError(403, 'Explicit delete action required.');
+        if (request.method === 'DELETE' && request.headers.get('Origin') && request.headers.get('Origin') !== url.origin) throw new HttpError(403, 'Same-origin action required.');
         return stub.fetch(new Request('https://internal' + url.pathname, { method: request.method }));
       }
       return json({ error: 'Not found.' }, 404);
@@ -99,6 +120,8 @@ export class Gallery {
     // No refund after failed/ambiguous storage operations.
   }
   async handle(request) {
+    const game = await handleGame(this, request);
+    if (game) return game;
     const store = this.ctx.storage;
     const url = new URL(request.url);
     if (url.pathname === '/api/usage') return json({ totals: await store.get('totals') || { bytes: 0, objects: 0 }, usage: await store.get('usage'), limits: LIMITS });
@@ -147,6 +170,7 @@ export class Gallery {
     const record = await store.get(key);
     if (!record || record.state === 'deleted') throw new HttpError(404, 'Photo not found.');
     if (request.method === 'DELETE') {
+      if (await store.get('game:card:' + id)) throw new HttpError(409, 'This photo is a collectible. Retire the card in Headquarters instead of deleting its photo.');
       record.state = 'deleting'; await store.put(key, record);
       await this.spend('deletes');
       await this.photos.delete(id);
