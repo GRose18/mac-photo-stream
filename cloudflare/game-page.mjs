@@ -62,6 +62,7 @@ async function trading(){
   }
   if(owned.has(oldGive))give.value=oldGive;if(catalog.has(oldWant))want.value=oldWant;
   if(give.value===want.value)want.value=tradeData.catalog.find(c=>c.id!==give.value)?.id||'';
+  if(!want.value){const placeholder=el('option','','No other cards yet');placeholder.value='';placeholder.disabled=true;placeholder.selected=true;want.append(placeholder);}
   if(!owned.size){const placeholder=el('option','','No cards to offer');placeholder.value='';give.append(placeholder);}
   $('trade-submit').disabled=!owned.size||tradeData.catalog.length<2;
   const board=$('trade-board');board.replaceChildren();
