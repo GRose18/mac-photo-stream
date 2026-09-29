@@ -85,7 +85,7 @@ export async function handleGame(gallery, request) {
   limit.count++;await store.put(key,limit);
  }
  await store.put('game:usage',today);
- if(path==='/api/auth/logout'&&request.method==='POST')return reply({ok:true},200,{'Set-Cookie':cookie('',0)});
+ if(path==='/api/auth/logout'&&request.method==='POST')return reply({ok:true},200,{'Set-Cookie':cookie('signed-out')});
  if(authAttempt&&request.method==='POST'){
   const data=await body(request), username=credentials(data);
   if(path.endsWith('/login')){

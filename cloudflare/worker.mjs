@@ -53,7 +53,10 @@ export default {
       else if (authorization.startsWith('Basic ')) {
         try { allowed = await same(atob(authorization.slice(6)), `admin:${env.ADMIN_PASSWORD}`); } catch {}
       }
-      if (!upload && !allowed) allowed = (await readSession(request, env))?.role === 'admin';
+      // An explicit game session (including a signed-out marker) takes precedence
+      // over Basic credentials cached by browsers from the original gallery.
+      const hasGameCookie = /(?:^|;\s*)__Host-sclshi=/.test(request.headers.get('Cookie') || '');
+      if (!upload && (hasGameCookie || !allowed)) allowed = (await readSession(request, env))?.role === 'admin';
       const game = url.pathname.startsWith('/api/game/') || url.pathname.startsWith('/api/auth/');
       if (game) {
         if (!['GET','POST'].includes(request.method)) return json({error:'Method not allowed.'},405);

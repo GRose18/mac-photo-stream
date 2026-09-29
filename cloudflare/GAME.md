@@ -44,10 +44,10 @@ require admin authentication. Card image endpoints require ownership or admin
 access. Member passwords use salted PBKDF2-SHA256 (100,000 iterations). Seven-day
 sessions use HMAC-signed Secure/HttpOnly/SameSite=Strict cookies. Disabling a member
 invalidates their sessions; re-enabling requires another login. Admin password
-rotation invalidates all signed sessions. A logout clears the local cookie.
+rotation invalidates all signed sessions. A logout replaces the local cookie with a signed-out marker so cached legacy
+Basic credentials cannot immediately sign the browser back in.
 Existing Basic admin authentication remains supported for scripts and `/legacy`.
-Use a separate browser profile for member testing if the browser cached old
-Basic admin credentials. There is no self-service password recovery in this beta.
+An explicit game session takes precedence over cached Basic credentials. There is no self-service password recovery in this beta.
 
 All mutations require a same-origin custom-header request, invitations are random
 256-bit one-use secrets sent in URL fragments, and login attempts are throttled.
