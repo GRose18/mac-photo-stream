@@ -3,10 +3,14 @@ set -euo pipefail
 cd "$(dirname "$0")"
 APP="$PWD/build/Photo Stream.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" build/module-cache
-SDK_ARGS=()
-if [[ -n "${PHOTO_STREAM_SDK:-}" ]]; then SDK_ARGS=(-sdk "$PHOTO_STREAM_SDK"); fi
+SDK="${PHOTO_STREAM_SDK:-$(xcrun --show-sdk-path)}"
+# Prefer this stable SDK when present; some CLT installations point at a newer
+# beta SDK than their installed Swift compiler can read.
+if [[ -z "${PHOTO_STREAM_SDK:-}" && -d /Library/Developer/CommandLineTools/SDKs/MacOSX15.4.sdk ]]; then
+  SDK=/Library/Developer/CommandLineTools/SDKs/MacOSX15.4.sdk
+fi
 for ARCH in arm64 x86_64; do
-  swiftc "${SDK_ARGS[@]}" -parse-as-library -swift-version 5 -O -module-cache-path "$PWD/build/module-cache" -target "$ARCH-apple-macos13.0" PhotoStream.swift -o "build/PhotoStream-$ARCH"
+  swiftc -sdk "$SDK" -parse-as-library -swift-version 5 -O -module-cache-path "$PWD/build/module-cache" -target "$ARCH-apple-macos13.0" PhotoStream.swift -o "build/PhotoStream-$ARCH"
 done
 lipo -create build/PhotoStream-arm64 build/PhotoStream-x86_64 -output "$APP/Contents/MacOS/PhotoStream"
 cp ../photo_upload.py "$APP/Contents/Resources/photo_upload.py"
