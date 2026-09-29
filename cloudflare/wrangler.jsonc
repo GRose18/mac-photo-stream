@@ -1,0 +1,31 @@
+{
+  "name": "mac-photo-stream",
+  "account_id": "73b8d1bbe034c6c7f855360e77115dba",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-09-29",
+  "workers_dev": true,
+  "observability": {
+    "enabled": false
+  },
+  "vars": {
+    "SUPABASE_URL": "https://ghhgjogizbwzfyojxphy.supabase.co",
+    "SUPABASE_BUCKET": "photo-stream-worker",
+    "FREE_PLAN_SETUP_VERIFIED": "true"
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "GALLERY",
+        "class_name": "Gallery"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "Gallery"
+      ]
+    }
+  ]
+}
