@@ -1,5 +1,10 @@
 # Alternate Mac setup
 
+For automatic capture without a Terminal window, use the new
+[menu-bar app setup](menu-bar/README.md). It requests its own camera permission.
+The direct LaunchAgent below may be denied camera access even when Terminal is
+authorized; use the app if that happens.
+
 The new private website is:
 https://mac-photo-stream.photo-stream-cloudflare-draft.workers.dev
 
