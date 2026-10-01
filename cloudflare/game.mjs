@@ -1,5 +1,6 @@
 import { HttpError } from './budget.mjs';
 import { handleTrading } from './trading.mjs';
+import { galleryRoutes } from './gallery.mjs';
 
 const enc = new TextEncoder();
 const reply = (data, status = 200, headers = {}) => Response.json(data, {status, headers: {'Cache-Control':'no-store', ...headers}});
@@ -72,7 +73,7 @@ export async function handleGame(gallery, request) {
  if(!path.startsWith('/api/game/')&&!path.startsWith('/api/auth/')) return null;
  const usage=await store.get('game:usage');
  const today=usage?.day===day?usage:{day,requests:0,auth:0};
- if(today.requests>=GAME_LIMITS.requestsPerDay)throw new HttpError(429,'Daily game safety limit reached. Try after midnight UTC.');
+ if(today.requests>=(env.GALLERY_ONLY==='true'?1000:GAME_LIMITS.requestsPerDay))throw new HttpError(429,'Daily game safety limit reached. Try after midnight UTC.');
  today.requests++;
  const authAttempt=['/api/auth/login','/api/auth/signup'].includes(path);
  if(authAttempt){
@@ -114,11 +115,15 @@ export async function handleGame(gallery, request) {
   user=await store.get('game:user:'+identity.id);
   if(!user||user.disabled||user.version!==identity.version)throw new HttpError(401,'Please sign in again.');
  }
+ const galleryResponse=await galleryRoutes(gallery,request,identity,body);
+ if(galleryResponse)return galleryResponse;
+ if(env.GALLERY_ONLY==='true' && (['/api/game/pack','/api/game/spin','/api/game/collection','/api/game/admin/cards'].includes(path)||path.startsWith('/api/game/trad')||path.startsWith('/api/game/card-image/')))throw new HttpError(410,'The card game has been retired.');
  const tradeResponse = await handleTrading(gallery,request,identity,user,body);
  if(tradeResponse)return tradeResponse;
  const admin=identity.role==='admin';
  if(path.startsWith('/api/game/admin/')&&!admin)throw new HttpError(403,'Admin access required.');
  if(path==='/api/game/me'&&request.method==='GET'){
+  if(env.GALLERY_ONLY==='true')return reply({username:identity.id,role:identity.role});
   const cards=[...(await store.list({prefix:'game:card:',limit:GAME_LIMITS.cards})).values()];
   const available=cards.filter(c=>c.active&&(c.rarity!=='mythic'||!c.minted));
   const groups=Object.entries(RARITIES).filter(([r])=>available.some(c=>c.rarity===r));const sum=groups.reduce((s,[,w])=>s+w,0);

@@ -98,3 +98,22 @@ test('trading away the last copy closes conflicting offers',async()=>{
  const f=fixture(),a=await join(f,'alice'),b=await join(f,'bobby');await give(f,'alice',1);await give(f,'bobby',2);await publish(f,3);const first=await offer(f,a),second=await offer(f,a,1,3);
  await game(f,'/api/game/trades/'+first.id+'/accept',{},b);assert.equal((await f.storage.get('game:trades'))[second.id].status,'unavailable');
 });
+test('gallery mode keeps uploads private until shared and revokes image access on unshare',async()=>{
+ const f=fixture(),member=await join(f);f.env.GALLERY_ONLY='true';await f.call(photo());
+ let r=await game(f,'/api/game/gallery',undefined,member);assert.deepEqual((await r.json()).images,[]);
+ assert.equal((await game(f,'/api/game/gallery/image/'+id(1),undefined,member)).status,404);
+ assert.equal((await game(f,'/api/game/gallery/share',{id:id(1),shared:true},member)).status,403);
+ assert.equal((await game(f,'/api/game/gallery/share',{id:id(1),shared:true},adminHeaders)).status,200);
+ r=await game(f,'/api/game/gallery',undefined,member);assert.equal((await r.json()).images.length,1);
+ assert.equal((await game(f,'/api/game/gallery/image/'+id(1),undefined,member)).status,200);
+ await game(f,'/api/game/gallery/share',{id:id(1),shared:false},adminHeaders);
+ assert.equal((await game(f,'/api/game/gallery/image/'+id(1),undefined,member)).status,404);
+});
+test('gallery mode retains approved photos, disables rewards/trades, and lets admin explicitly delete old card photos',async()=>{
+ const f=fixture(),member=await join(f);await publish(f,1,'mythic');f.env.GALLERY_ONLY='true';
+ assert.equal((await(await game(f,'/api/game/gallery',undefined,member)).json()).images.length,1);
+ for(const path of ['/api/game/pack','/api/game/spin','/api/game/trades'])assert.equal((await game(f,path,{},member)).status,410);
+ const me=await(await game(f,'/api/game/me',undefined,member)).json();assert.equal(me.coins,undefined);assert.equal(me.role,'member');
+ assert.equal((await f.call(view('/api/images/'+id(1),'DELETE'))).status,204);
+ assert.equal((await(await game(f,'/api/game/gallery',undefined,member)).json()).images.length,0);
+});

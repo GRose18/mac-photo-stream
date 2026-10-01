@@ -45,5 +45,10 @@ try{
  r=await action('/api/game/trades',{give:cardId,want:commonId},member);assert.equal(r.status,201);const trade=(await r.json()).offer;
  r=await action('/api/game/trades/'+trade.id+'/accept',{},second);assert.equal(r.status,200,await r.clone().text());
  r=await mf.dispatchFetch('https://test/api/game/collection',{headers:second});const afterTrade=await r.json();assert.equal(afterTrade.cards.length,1);assert.equal(afterTrade.cards[0].id,cardId);assert.equal(afterTrade.cards[0].rarity,'mythic');
- console.log('Cloudflare runtime smoke passed: uploads, quotas, signup, rewards, privacy, and an atomic mythic trade.');
+ r=await mf.dispatchFetch('https://test/api/game/gallery',{headers:member});assert.equal(r.status,200);assert.equal((await r.json()).images.length,2);
+ r=await action('/api/game/gallery/share',{id:commonId,shared:false},auth);assert.equal(r.status,200);
+ r=await mf.dispatchFetch('https://test/api/game/gallery/image/'+commonId,{headers:member});assert.equal(r.status,404);
+ r=await action('/api/game/gallery/share',{id:commonId,shared:true},auth);assert.equal(r.status,200);
+ r=await mf.dispatchFetch('https://test/api/game/gallery/image/'+commonId,{headers:member});assert.equal(r.status,200);
+ console.log('Cloudflare runtime smoke passed: uploads, auth, persisted game compatibility, gallery listing, sharing, and private image access.');
 }finally{await mf.dispose();}

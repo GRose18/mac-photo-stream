@@ -1,9 +1,6 @@
-## Sclshi card game
+## Avi G Gallery
 
-The website now includes invite-only accounts, admin photo approval, daily packs,
-one-of-one mythics, a daily coin wheel, private collections, and one-for-one card trading. See [GAME.md](GAME.md)
-for admin setup, game rules, privacy, and free-plan limits. Camera uploads continue
-to use the existing endpoint and token.
+The live site is a private photo gallery. See [GALLERY.md](GALLERY.md) for viewing, sharing, invitations, and limits. Existing camera uploads and saved sign-ins continue to work.
 
 # Photo Stream — Cloudflare Workers Free + Supabase Free
 

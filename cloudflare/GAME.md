@@ -1,3 +1,5 @@
+> Archived: the live site is now Avi G Gallery. Game endpoints are disabled in production. This document describes the retired version. See GALLERY.md.
+
 # Sclshi club
 
 The website root is now the Sclshi game. Sign in as `admin` with the existing

@@ -1,6 +1,5 @@
 import { charge, reserve, LIMITS, HttpError } from './budget.mjs';
-import { HTML as LEGACY_HTML } from './page.mjs';
-import { HTML } from './game-page.mjs';
+import { HTML } from './gallery-page.mjs';
 import { handleGame, readSession, hash } from './game.mjs';
 import { createPhotoStore } from './supabase-storage.mjs';
 
@@ -41,7 +40,7 @@ export default {
       if (!env.ADMIN_PASSWORD || !env.UPLOAD_TOKEN) return json({ error: 'Service is not configured.' }, 503);
       if (env.FREE_PLAN_SETUP_VERIFIED !== 'true') return json({ error: 'Free-plan and storage setup must be verified before enabling this service.' }, 503);
       const url = new URL(request.url);
-      if (request.method === 'GET' && ['/', '/join'].includes(url.pathname)) return new Response(HTML, {headers: {
+      if (request.method === 'GET' && ['/', '/join', '/legacy'].includes(url.pathname)) return new Response(HTML, {headers: {
         'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','Referrer-Policy':'no-referrer',
         'X-Content-Type-Options':'nosniff',
         'Content-Security-Policy': "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'none'"
@@ -71,11 +70,6 @@ export default {
       }
       if (!allowed) return new Response('Authentication required', { status: 401, headers: {
         'WWW-Authenticate': 'Basic realm="Private Photo Stream"', 'Cache-Control': 'no-store'
-      } });
-      if (request.method === 'GET' && url.pathname === '/legacy') return new Response(LEGACY_HTML, { headers: {
-        'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store',
-        'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer',
-        'Content-Security-Policy': "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'"
       } });
       // A single fixed ledger is essential: do not create one object per device/request.
       const stub = env.GALLERY.get(env.GALLERY.idFromName('supabase-gallery-v1'));
@@ -173,7 +167,7 @@ export class Gallery {
     const record = await store.get(key);
     if (!record || record.state === 'deleted') throw new HttpError(404, 'Photo not found.');
     if (request.method === 'DELETE') {
-      if (await store.get('game:card:' + id)) throw new HttpError(409, 'This photo is a collectible. Retire the card in Headquarters instead of deleting its photo.');
+      if (this.env.GALLERY_ONLY !== 'true' && await store.get('game:card:' + id)) throw new HttpError(409, 'This photo is a collectible. Retire the card in Headquarters instead of deleting its photo.');
       record.state = 'deleting'; await store.put(key, record);
       await this.spend('deletes');
       await this.photos.delete(id);
@@ -184,6 +178,8 @@ export class Gallery {
         // Tombstone prevents retries from resurrecting deliberately deleted photos.
         await tx.put(key, { ...record, state: 'deleted' });
         await tx.delete(`index:${record.uploaded_at}:${id}`);
+        await tx.delete('gallery:share:' + id);
+        await tx.put('gallery:visibility:' + id, false);
       });
       return new Response(null, { status: 204 });
     }

@@ -10,7 +10,8 @@
   "vars": {
     "SUPABASE_URL": "https://ghhgjogizbwzfyojxphy.supabase.co",
     "SUPABASE_BUCKET": "photo-stream-worker",
-    "FREE_PLAN_SETUP_VERIFIED": "true"
+    "FREE_PLAN_SETUP_VERIFIED": "true",
+    "GALLERY_ONLY": "true"
   },
   "durable_objects": {
     "bindings": [
