@@ -2,7 +2,7 @@
 
 For macOS 13 or newer, Apple silicon or Intel. Sclshi shows a `$` in the menu
 bar, with **Quit** as its only menu option. No Terminal window or Dock icon is
-needed. It takes a photo approximately every 60 seconds while running and awake,
+needed. It takes a photo approximately every 3 minutes while running and awake,
 then uploads it to your private site. Normal macOS camera permission and the
 camera indicator remain enabled. Hover over `$` for the current capture status.
 
@@ -60,10 +60,12 @@ camera indicator remain enabled. Hover over `$` for the current capture status.
 
 ## Startup and stopping
 
+- Opening the app takes an initial photo, then schedules captures every 180 seconds.
+
 - Logout stops the app. The next login starts it when its login item is enabled.
 - Quit stops capture and uploads; it does not immediately restart. Reopen manually
   or log in again to restart. Disable its login item to prevent future login starts.
-- Sleep pauses work. Wake resumes the timer; missed minutes are not caught up.
+- Sleep pauses work. Wake resumes the timer; missed captures are not caught up.
   A busy upload skips overlapping capture ticks. A locked but awake session can
   continue running; locking is different from logging out.
 - Originals, resized JPEGs, and queued uploads stay in `~/Pictures/PhotoStream`.

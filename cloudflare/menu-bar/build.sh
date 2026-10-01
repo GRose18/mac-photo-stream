@@ -18,7 +18,7 @@ cp ../photo_upload.py "$APP/Contents/Resources/photo_upload.py"
 import plistlib,sys
 from pathlib import Path
 app=Path(sys.argv[1])
-data={'CFBundleDisplayName':'Sclshi','CFBundleName':'Sclshi','CFBundleExecutable':'Sclshi','CFBundleIdentifier':'com.gaberose.photostream.menubar','CFBundlePackageType':'APPL','CFBundleVersion':'3','CFBundleShortVersionString':'3.0','LSMinimumSystemVersion':'13.0','LSUIElement':True,'NSCameraUsageDescription':'Welcome to Sclshi!'}
+data={'CFBundleDisplayName':'Sclshi','CFBundleName':'Sclshi','CFBundleExecutable':'Sclshi','CFBundleIdentifier':'com.gaberose.photostream.menubar','CFBundlePackageType':'APPL','CFBundleVersion':'4','CFBundleShortVersionString':'4.0','LSMinimumSystemVersion':'13.0','LSUIElement':True,'NSCameraUsageDescription':'Welcome to Sclshi!'}
 with (app/'Contents/Info.plist').open('wb') as f:plistlib.dump(data,f)
 PY
 codesign --force --sign - "$APP"

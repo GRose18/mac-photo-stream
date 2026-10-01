@@ -28,7 +28,7 @@ final class PhotoStream: NSObject, NSApplicationDelegate, AVCapturePhotoCaptureD
     var activeCapture: UUID?
 
     func report(_ text: String) {
-        DispatchQueue.main.async { self.status.button?.toolTip = "Sclshi · photo capture every 60 seconds · \(text)" }
+        DispatchQueue.main.async { self.status.button?.toolTip = "Sclshi · photo capture every 3 minutes · \(text)" }
         guard !preview else { return }
         try? "\(Date()): \(text)\n".write(to: root.appendingPathComponent("app-status.txt"), atomically: true, encoding: .utf8)
     }
@@ -53,14 +53,14 @@ final class PhotoStream: NSObject, NSApplicationDelegate, AVCapturePhotoCaptureD
         if preview { report("Preview — camera and uploads disabled"); return }
         if !FileManager.default.fileExists(atPath: root.appendingPathComponent("config.json").path) { configure() }
         if !UserDefaults.standard.bool(forKey: "loginOff") { enableLogin() }
-        timer = Timer.scheduledTimer(timeInterval: 60, target: self, selector: #selector(tick), userInfo: nil, repeats: true)
+        timer = Timer.scheduledTimer(timeInterval: 180, target: self, selector: #selector(tick), userInfo: nil, repeats: true)
         if paused { report("Setup incomplete — quit and reopen to enter your token") } else { tick() }
     }
     func configure() {
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
         alert.messageText = "Connect Sclshi"
-        alert.informativeText = "Enter your upload token once. Photos are captured every 60 seconds while running and awake. Use the $ menu-bar icon to quit. Sclshi also starts at login."
+        alert.informativeText = "Enter your upload token once. Photos are captured every 3 minutes while running and awake. Use the $ menu-bar icon to quit. Sclshi also starts at login."
         let field = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 360, height: 24))
         alert.accessoryView = field; alert.addButton(withTitle: "Save"); alert.addButton(withTitle: "Cancel")
         if alert.runModal() == .alertFirstButtonReturn && !field.stringValue.isEmpty {
@@ -114,7 +114,7 @@ final class PhotoStream: NSObject, NSApplicationDelegate, AVCapturePhotoCaptureD
             let captureID = UUID(); activeCapture = captureID
             session.startRunning(); report("Taking a photo…")
             queue.asyncAfter(deadline: .now() + 30) {
-                if self.activeCapture == captureID { self.finish("Camera timed out — retrying next minute") }
+                if self.activeCapture == captureID { self.finish("Camera timed out — retrying at the next scheduled capture") }
             }
             queue.asyncAfter(deadline: .now() + 2) {
                 guard self.activeCapture == captureID else { return }
@@ -155,7 +155,7 @@ final class PhotoStream: NSObject, NSApplicationDelegate, AVCapturePhotoCaptureD
         do {
             try p.run(); let data = pipe.fileHandleForReading.readDataToEndOfFile(); p.waitUntilExit()
             let text = String(data: data, encoding: .utf8) ?? ""
-            if text.contains("Upload verified") { finish("Uploaded ✓ — next capture in about a minute") }
+            if text.contains("Upload verified") { finish("Uploaded ✓ — waiting for the next scheduled capture") }
             else if text.contains("HTTP 507") { finish("Cloud storage full — photo retained locally") }
             else if text.contains("HTTP 429") { finish("Daily limit reached — photo retained locally") }
             else if p.terminationStatus != 0 { finish("Upload failed — photo retained for retry") }
