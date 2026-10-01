@@ -1,6 +1,6 @@
 # Avi G Gallery
 
-The website is now a private photo gallery with a masonry photo grid, capture
+The website is now a private photo gallery with a responsive photo grid, capture
 timestamps, pagination, and an enlarged photo viewer. Packs, coins, rarity
 labels, and trading are removed from the interface. GALLERY_ONLY=true disables
 the retired game endpoints. Historical game records are preserved, not erased.
