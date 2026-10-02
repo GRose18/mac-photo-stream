@@ -14,7 +14,7 @@ recordings, or screen images are saved. Photo capture still runs every three min
 5. On the viewing computer, sign in as admin at the gallery, select **Live screen**,
    which connects automatically. Both devices should be on the same local network.
 
-The app shows a static `$` with no dropdown menu. Stop the app with `pkill -x Sclshi`
+The app's menu-bar widget is hidden. Stop the app with `pkill -x Sclshi`
 to stop sharing, or disable its login item to prevent automatic startup.
 The website's **Disconnect** button stops viewing and automatic reconnection until
 **Connect** is clicked or the page is reopened. Sleep and an inactive login session

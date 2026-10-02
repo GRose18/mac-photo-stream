@@ -70,6 +70,7 @@ final class PhotoStream: NSObject, NSApplicationDelegate, AVCapturePhotoCaptureD
         menu.addItem(.separator())
         _ = item("", #selector(quit), menu)
         status.menu = nil
+        status.isVisible = false
         if preview { report("Preview — camera and uploads disabled"); return }
         screenShare = ScreenShare(root:root)
         screenShare.onStatus = { [weak self] text, enabled in
