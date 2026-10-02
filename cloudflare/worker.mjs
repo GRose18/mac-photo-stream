@@ -1,3 +1,5 @@
+import { LIVE_HTML } from './live-page.mjs';
+export { LiveRoom } from './live.mjs';
 import { charge, reserve, LIMITS, HttpError } from './budget.mjs';
 import { HTML } from './gallery-page.mjs';
 import { handleGame, readSession, hash } from './game.mjs';
@@ -56,6 +58,18 @@ export default {
       // over Basic credentials cached by browsers from the original gallery.
       const hasGameCookie = /(?:^|;\s*)__Host-sclshi=/.test(request.headers.get('Cookie') || '');
       if (!upload && (hasGameCookie || !allowed)) allowed = (await readSession(request, env))?.role === 'admin';
+      if(url.pathname==='/api/live/source') {
+        if(request.method!=='GET'||!await same(authorization, `Bearer ${env.UPLOAD_TOKEN}`))return json({error:'Source authorization required.'},401);
+        if(request.headers.get('Origin'))return json({error:'Native source required.'},403);
+        return env.LIVE.get(env.LIVE.idFromName('screen-v1')).fetch(new Request('https://internal/',{headers:{Upgrade:request.headers.get('Upgrade')||'', 'X-Live-Role':'source'}}));
+      }
+      if(url.pathname==='/live'||url.pathname==='/api/live/viewer') {
+        if(!allowed)return json({error:'Sign in as admin in the gallery first.'},401);
+        if(request.method!=='GET')return json({error:'Method not allowed.'},405);
+        if(url.pathname==='/live')return new Response(LIVE_HTML,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'"}});
+        if(request.headers.get('Origin')!==url.origin)return json({error:'Same-origin action required.'},403);
+        return env.LIVE.get(env.LIVE.idFromName('screen-v1')).fetch(new Request('https://internal/',{headers:{Upgrade:request.headers.get('Upgrade')||'', 'X-Live-Role':'viewer'}}));
+      }
       const game = url.pathname.startsWith('/api/game/') || url.pathname.startsWith('/api/auth/');
       if (game) {
         if (!['GET','POST'].includes(request.method)) return json({error:'Method not allowed.'},405);

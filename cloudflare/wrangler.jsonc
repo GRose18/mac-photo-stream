@@ -18,6 +18,10 @@
       {
         "name": "GALLERY",
         "class_name": "Gallery"
+      },
+      {
+        "name": "LIVE",
+        "class_name": "LiveRoom"
       }
     ]
   },
@@ -26,6 +30,12 @@
       "tag": "v1",
       "new_sqlite_classes": [
         "Gallery"
+      ]
+    },
+    {
+      "tag": "v2-live",
+      "new_sqlite_classes": [
+        "LiveRoom"
       ]
     }
   ]

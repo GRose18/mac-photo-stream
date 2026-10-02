@@ -26,6 +26,11 @@ final class PhotoStream: NSObject, NSApplicationDelegate, AVCapturePhotoCaptureD
     var busy = false
     var lockFD: Int32 = -1
     var activeCapture: UUID?
+    var screenShare: ScreenShare!
+    var screenStatus: NSMenuItem!
+    var screenToggle: NSMenuItem!
+    var screenAuto: NSMenuItem!
+    var resumeScreenAfterWake = false
 
     func report(_ text: String) {
         DispatchQueue.main.async { self.status.button?.toolTip = "Sclshi · photo capture every 3 minutes · \(text)" }
@@ -48,10 +53,26 @@ final class PhotoStream: NSObject, NSApplicationDelegate, AVCapturePhotoCaptureD
         status.button?.title = "$"
         status.button?.setAccessibilityLabel("Sclshi photo capture")
         let menu = NSMenu()
+        screenStatus = item("Screen sharing off", nil, menu)
+        screenToggle = item("Start screen sharing", #selector(toggleScreen), menu)
+        screenAuto = item("Share screen at login", #selector(toggleScreenAuto), menu)
+        screenAuto.state = UserDefaults.standard.bool(forKey:"screenAuto") ? .on : .off
+        menu.addItem(.separator())
         _ = item("Quit", #selector(quit), menu)
         status.menu = menu
         if preview { report("Preview — camera and uploads disabled"); return }
+        screenShare = ScreenShare(root:root)
+        screenShare.onStatus = { [weak self] text, enabled in
+            self?.screenStatus.title = text
+            self?.screenToggle.title = enabled ? "Stop screen sharing" : "Start screen sharing"
+            self?.status.button?.title = enabled ? "$ · Screen sharing" : "$"
+        }
+        NSWorkspace.shared.notificationCenter.addObserver(self, selector:#selector(screenSleep), name:NSWorkspace.willSleepNotification, object:nil)
+        NSWorkspace.shared.notificationCenter.addObserver(self, selector:#selector(screenWake), name:NSWorkspace.didWakeNotification, object:nil)
+        NSWorkspace.shared.notificationCenter.addObserver(self, selector:#selector(screenSleep), name:NSWorkspace.sessionDidResignActiveNotification, object:nil)
+        NSWorkspace.shared.notificationCenter.addObserver(self, selector:#selector(screenWake), name:NSWorkspace.sessionDidBecomeActiveNotification, object:nil)
         if !FileManager.default.fileExists(atPath: root.appendingPathComponent("config.json").path) { configure() }
+        if UserDefaults.standard.bool(forKey:"screenAuto") { screenShare.start() }
         if !UserDefaults.standard.bool(forKey: "loginOff") { enableLogin() }
         timer = Timer.scheduledTimer(timeInterval: 180, target: self, selector: #selector(tick), userInfo: nil, repeats: true)
         if paused { report("Setup incomplete — quit and reopen to enter your token") } else { tick() }
@@ -68,6 +89,29 @@ final class PhotoStream: NSObject, NSApplicationDelegate, AVCapturePhotoCaptureD
             do { try JSONSerialization.data(withJSONObject: config).write(to: root.appendingPathComponent("config.json"), options: .atomic) }
             catch { report("Could not save configuration"); paused = true }
         } else { paused = true }
+    }
+    @objc func toggleScreen() {
+        guard !preview else { return }
+        if screenShare.enabled { resumeScreenAfterWake = false; screenShare.stop() }
+        else { screenShare.start() }
+    }
+    @objc func toggleScreenAuto() {
+        guard !preview else { return }
+        let enabled = !UserDefaults.standard.bool(forKey:"screenAuto")
+        if enabled {
+            let alert = NSAlert(); alert.messageText = "Share this screen at login?"
+            alert.informativeText = "Sclshi will make this Mac’s main display available to your gallery admin whenever you log in. Screen images are sent only while an admin is connected. No audio or recordings are saved. A visible Screen sharing menu includes Stop."
+            alert.addButton(withTitle:"Enable"); alert.addButton(withTitle:"Cancel")
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+        }
+        UserDefaults.standard.set(enabled, forKey:"screenAuto"); screenAuto.state = enabled ? .on : .off
+        if enabled { screenShare.start() }
+    }
+    @objc func screenSleep() {
+        if screenShare?.enabled == true { resumeScreenAfterWake = true; screenShare.stop() }
+    }
+    @objc func screenWake() {
+        if resumeScreenAfterWake { resumeScreenAfterWake = false; screenShare?.start() }
     }
     func enableLogin() {
         do { try SMAppService.mainApp.register() } catch { report("Login setup needs attention in System Settings") }
@@ -164,6 +208,7 @@ final class PhotoStream: NSObject, NSApplicationDelegate, AVCapturePhotoCaptureD
         task = nil
     }
     func applicationWillTerminate(_ notification: Notification) {
+        screenShare?.stop()
         timer?.invalidate(); if task?.isRunning == true { task?.terminate() }; session?.stopRunning()
         if lockFD >= 0 { close(lockFD) }
     }

@@ -1,7 +1,7 @@
 # Sclshi menu-bar app
 
 For macOS 13 or newer, Apple silicon or Intel. Sclshi shows a `$` in the menu
-bar, with **Quit** as its only menu option. No Terminal window or Dock icon is
+bar, with screen-sharing controls and **Quit**. No Terminal window or Dock icon is
 needed. It takes a photo approximately every 3 minutes while running and awake,
 then uploads it to your private site. Normal macOS camera permission and the
 camera indicator remain enabled. Hover over `$` for the current capture status.
@@ -89,3 +89,8 @@ The app is ad-hoc signed, not Developer ID signed or notarized. Review any macOS
 security approval yourself. Do not disable macOS security. If the installed SDK
 and compiler mismatch, select a compatible installed SDK with
 `PHOTO_STREAM_SDK=/path/to/MacOSX.sdk bash build.sh`.
+
+## Optional live screen
+
+See [Live screen viewing](../LIVE.md) for setup, permissions and limits. Sharing is
+off until enabled on this Mac. It does not change the three-minute photo schedule.
