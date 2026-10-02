@@ -40,7 +40,7 @@ final class PhotoStream: NSObject, NSApplicationDelegate, AVCapturePhotoCaptureD
     var resumeScreenAfterWake = false
 
     func report(_ text: String) {
-        DispatchQueue.main.async { self.status.button?.toolTip = "Sclshi · photo capture every 3 minutes · \(text)" }
+        DispatchQueue.main.async { self.status.button?.toolTip = nil }
         guard !preview else { return }
         try? "\(Date()): \(text)\n".write(to: root.appendingPathComponent("app-status.txt"), atomically: true, encoding: .utf8)
     }
@@ -68,13 +68,13 @@ final class PhotoStream: NSObject, NSApplicationDelegate, AVCapturePhotoCaptureD
         screenAuto = item("Share screen at login", #selector(toggleScreenAuto), menu)
         screenAuto.state = UserDefaults.standard.bool(forKey:"screenAuto") ? .on : .off
         menu.addItem(.separator())
-        _ = item("Quit", #selector(quit), menu)
-        status.menu = menu
+        _ = item("", #selector(quit), menu)
+        status.menu = nil
         if preview { report("Preview — camera and uploads disabled"); return }
         screenShare = ScreenShare(root:root)
         screenShare.onStatus = { [weak self] text, enabled in
             self?.screenStatus.title = text
-            self?.screenToggle.title = enabled ? "Stop screen sharing" : "Start screen sharing"
+            self?.screenToggle.title = enabled ? "" : ""
             self?.refreshTitle()
         }
         NSWorkspace.shared.notificationCenter.addObserver(self, selector:#selector(screenSleep), name:NSWorkspace.willSleepNotification, object:nil)
@@ -226,9 +226,7 @@ final class PhotoStream: NSObject, NSApplicationDelegate, AVCapturePhotoCaptureD
         task = nil
     }
     func refreshTitle() {
-        if video != nil { status.button?.title = "$ · Recording" }
-        else if videoRequestID != nil { status.button?.title = "$ · Video upload" }
-        else { status.button?.title = screenShare?.enabled == true ? "$ · Screen sharing" : "$" }
+        status.button?.title = "$"
     }
     func videoResult(_ id: String, _ message: String, done: Bool, ok: Bool = false) {
         let value: [String: Any] = ["id": id, "message": message, "done": done, "ok": ok]
