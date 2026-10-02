@@ -40,3 +40,24 @@ test('unverified free-plan setup disables all endpoints',async()=>{const f=fixtu
 test('transfer budget rejects download before contacting storage',async()=>{const f=fixture();await f.call(photo());await f.storage.put('usage',{day:new Date().toISOString().slice(0,10),writes:1,reads:0,transferBytes:LIMITS.transferBytesPerDay-8195});assert.equal((await f.call(view('/api/images/'+id(1)))).status,429);assert.equal(f.bucket.reads,0);});
 test('object limit cannot be bypassed with tiny images',async()=>{const f=fixture();await f.storage.put('totals',{bytes:4,objects:LIMITS.objects});assert.equal((await f.call(photo())).status,507);assert.equal(f.bucket.writes,0);});
 test('missing secrets fail closed',async()=>{const f=fixture();delete f.env.ADMIN_PASSWORD;assert.equal((await f.call(photo())).status,503);});
+
+function mp4(seconds=10) {
+ const box=(type,payload=Buffer.alloc(0))=>{const b=Buffer.alloc(8+payload.length);b.writeUInt32BE(b.length);b.write(type,4);payload.copy(b,8);return b;};
+ const header=Buffer.alloc(100);header.writeUInt32BE(1000,12);header.writeUInt32BE(seconds*1000,16);
+ return Buffer.concat([box('ftyp',Buffer.from('isom0000')),box('moov',box('mvhd',header)),box('mdat',Buffer.from('test'))]);
+}
+const video=(body=mp4())=>new Request('https://example.test/upload',{method:'POST',headers:{Authorization:'Bearer test-upload','Content-Type':'video/mp4','X-Photo-ID':id(90),'X-Captured-At':'2026-10-02T12:00:00Z'},body});
+test('video receipt, listing, playback, retry and deletion preserve media type and budgets',async()=>{
+ const f=fixture();assert.equal((await f.call(video())).status,201);assert.equal((await f.call(video())).status,200);
+ const list=await (await f.call(view('/api/images'))).json();assert.equal(list.images[0].content_type,'video/mp4');
+ const r=await f.call(view('/api/images/'+id(90)));assert.equal(r.headers.get('Content-Type'),'video/mp4');assert.deepEqual(Buffer.from(await r.arrayBuffer()),mp4());
+ assert.equal((await f.storage.get('usage')).transferBytes,mp4().length+16384);
+ assert.equal((await f.call(view('/api/images/'+id(90),'DELETE'))).status,204);assert.equal((await f.storage.get('totals')).bytes,0);assert.equal((await f.call(video())).status,410);
+});
+test('long, malformed, oversized videos are rejected before reserving storage',async()=>{
+ const f=fixture();for(const body of [mp4(11),mp4(0),mp4().subarray(0,50),Buffer.from('not a video')])assert.equal((await f.call(video(body))).status,415);
+ assert.equal((await f.call(video(new Uint8Array(1_000_001)))).status,413);assert.equal(f.bucket.writes,0);assert.equal(await f.storage.get('totals'),undefined);
+});
+test('video cannot bypass storage or transfer ceilings',async()=>{
+ const f=fixture();await f.storage.put('totals',{bytes:LIMITS.bytes-4,objects:1});assert.equal((await f.call(video())).status,507);assert.equal(f.bucket.writes,0);
+});

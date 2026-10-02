@@ -24,7 +24,7 @@ export function charge(usage, kind, now = new Date(), transferBytes = 8192) {
 }
 export function reserve(totals, size) {
   if (!Number.isSafeInteger(size) || size < 4 || size > LIMITS.imageBytes)
-    throw new HttpError(413, 'JPEG must be at most 1 MB.');
+    throw new HttpError(413, 'Upload must be at most 1 MB.');
   const next = { bytes: (totals?.bytes || 0) + size, objects: (totals?.objects || 0) + 1 };
   if (next.bytes > LIMITS.bytes || next.objects > LIMITS.objects)
     throw new HttpError(507, 'Storage safety limit reached. No photos were removed. Keep your local copy.');

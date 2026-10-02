@@ -67,10 +67,11 @@ def enqueue(root, source=None):
 
 def send(folder, config):
     item = json.loads((folder / 'receipt.json').read_text())
-    upload = folder / 'upload.jpg'
+    content_type = item.get('content_type', 'image/jpeg')
+    upload = folder / ('upload.mp4' if content_type == 'video/mp4' else 'upload.jpg')
     if hashlib.sha256(upload.read_bytes()).hexdigest() != item['sha256']:
         raise RuntimeError('Queued photo changed; refusing to upload it under the old ID.')
-    headers = {'Authorization': 'Bearer ' + config['token'], 'Content-Type': 'image/jpeg', 'X-Photo-ID': item['id'], 'X-Captured-At': item['captured_at']}
+    headers = {'Authorization': 'Bearer ' + config['token'], 'Content-Type': content_type, 'X-Photo-ID': item['id'], 'X-Captured-At': item['captured_at']}
     # Pass credentials on stdin, never in process arguments. TLS verification stays on.
     curl_config = ''.join('header = ' + json.dumps(k + ': ' + v) + '\n' for k, v in headers.items())
     result = subprocess.run(['/usr/bin/curl', '--config', '-', '--silent', '--show-error', '--proto', '=https', '--connect-timeout', '10', '--max-time', '25', '--max-filesize', '65536', '--request', 'POST', '--data-binary', '@' + str(upload), '--write-out', '\n%{http_code}', config['url'].rstrip('/') + '/upload'], input=curl_config.encode(), capture_output=True, timeout=30)

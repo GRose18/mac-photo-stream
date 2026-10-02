@@ -30,3 +30,10 @@ test('Supabase errors propagate instead of producing a false upload receipt',asy
   try {const store=createPhotoStore({SUPABASE_URL:'https://example.supabase.co',SUPABASE_SECRET_KEY:'sb_secret_test',SUPABASE_BUCKET:'photo-stream-worker'});await assert.rejects(()=>store.put('photo',new Uint8Array([255,216,255,217]).buffer));}
   finally{globalThis.fetch=original;}
 });
+test('video support preserves private bucket limits and uses MP4 paths for its lifecycle',async()=>{
+ const original=globalThis.fetch,calls=[];
+ globalThis.fetch=async(input,options)=>{const url=String(input);calls.push({url,options});if(url.endsWith('/bucket/photo-stream-worker'))return Response.json(options.method==='PUT'?{}:{public:false,file_size_limit:1000000,allowed_mime_types:['image/jpeg']});if(options.method==='POST'||options.method==='DELETE')return Response.json({});return new Response('video');};
+ try{const store=createPhotoStore({SUPABASE_URL:'https://example.supabase.co',SUPABASE_SECRET_KEY:'sb_secret_test',SUPABASE_BUCKET:'photo-stream-worker'});await store.put('clip',new Uint8Array([0,1]),'video/mp4');await store.get('clip','video/mp4');await store.delete('clip','video/mp4');
+ const update=calls.find(c=>c.options.method==='PUT');const body=JSON.parse(update.options.body);assert.equal(body.public,false);assert.equal(body.file_size_limit,1000000);assert.deepEqual(body.allowed_mime_types,['image/jpeg','video/mp4']);assert.match(calls[2].url,/clip.mp4$/);assert.deepEqual(JSON.parse(calls.at(-1).options.body),{prefixes:['clip.mp4']});
+ }finally{globalThis.fetch=original;}
+});

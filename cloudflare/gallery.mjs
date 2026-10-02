@@ -11,7 +11,7 @@ export async function galleryRoutes(gallery,request,identity,parseBody){
   const cards=await store.list({prefix:'game:card:',limit:500});
   const shares=await store.list({prefix:'gallery:share:',limit:500});
   const ids=new Set([...cards.values()].filter(c=>c.active).map(c=>c.id));for(const s of shares.values())ids.add(s.id);
-  const images=[];for(const id of ids){if(!await visible(store,id))continue;const p=await store.get('photo:'+id);if(p?.state==='ready')images.push({id,captured_at:p.captured_at,uploaded_at:p.uploaded_at,data:'/api/game/gallery/image/'+id});}
+  const images=[];for(const id of ids){if(!await visible(store,id))continue;const p=await store.get('photo:'+id);if(p?.state==='ready')images.push({id,content_type:p.content_type||'image/jpeg',captured_at:p.captured_at,uploaded_at:p.uploaded_at,data:'/api/game/gallery/image/'+id});}
   images.sort((a,b)=>b.uploaded_at.localeCompare(a.uploaded_at)||b.id.localeCompare(a.id));
   const before=url.searchParams.get('before');const start=before?images.findIndex(p=>p.id===before)+1:0;
   if(before&&!start)throw new HttpError(400,'Page has changed. Refresh the gallery.');

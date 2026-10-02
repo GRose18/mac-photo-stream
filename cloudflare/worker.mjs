@@ -1,3 +1,4 @@
+import { videoDuration } from './media.mjs';
 import { LIVE_HTML } from './live-page.mjs';
 export { LiveRoom } from './live.mjs';
 import { charge, reserve, LIMITS, HttpError } from './budget.mjs';
@@ -17,7 +18,7 @@ async function same(a, b) {
   return diff === 0;
 }
 async function bodyWithinLimit(request) {
-  if (!request.body) throw new HttpError(400, 'Missing JPEG.');
+  if (!request.body) throw new HttpError(400, 'Missing media.');
   const reader = request.body.getReader();
   const chunks = []; let length = 0;
   try {
@@ -25,13 +26,14 @@ async function bodyWithinLimit(request) {
       const { done, value } = await reader.read();
       if (done) break;
       length += value.length;
-      if (length > LIMITS.imageBytes) { await reader.cancel(); throw new HttpError(413, 'JPEG must be at most 1 MB.'); }
+      if (length > LIMITS.imageBytes) { await reader.cancel(); throw new HttpError(413, 'Upload must be at most 1 MB.'); }
       chunks.push(value);
     }
   } finally { reader.releaseLock(); }
   const bytes = new Uint8Array(length); let offset = 0;
   for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
-  if (bytes[0] !== 255 || bytes[1] !== 216 || bytes[2] !== 255 || length < 4)
+  if (request.headers.get('Content-Type') === 'video/mp4') videoDuration(bytes);
+  else if (bytes[0] !== 255 || bytes[1] !== 216 || bytes[2] !== 255 || length < 4)
     throw new HttpError(415, 'Upload a JPEG.');
   return bytes;
 }
@@ -45,7 +47,7 @@ export default {
       if (request.method === 'GET' && ['/', '/join', '/legacy'].includes(url.pathname)) return new Response(HTML, {headers: {
         'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','Referrer-Policy':'no-referrer',
         'X-Content-Type-Options':'nosniff',
-        'Content-Security-Policy': "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'none'"
+        'Content-Security-Policy': "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'none'"
       }});
       const upload = request.method === 'POST' && url.pathname === '/upload';
       const authorization = request.headers.get('Authorization') || '';
@@ -111,6 +113,7 @@ export default {
         if (!captured || !Number.isFinite(Date.parse(captured))) throw new HttpError(400, 'X-Captured-At must be an ISO timestamp.');
         const bytes = await bodyWithinLimit(request);
         return stub.fetch(new Request('https://internal/upload', { method: 'POST', body: bytes, headers: {
+          'Content-Type': request.headers.get('Content-Type') === 'video/mp4' ? 'video/mp4' : 'image/jpeg',
           'X-Photo-ID': id, 'X-Captured-At': new Date(captured).toISOString(), 'X-SHA256': await digest(bytes),
           'X-Timestamp-Kind': request.headers.get('X-Timestamp-Kind') === 'legacy-upload' ? 'legacy-upload' : 'capture'
         } }));
@@ -158,13 +161,14 @@ export class Gallery {
       const key = 'photo:' + id;
       const bytes = await request.arrayBuffer();
       const sha = request.headers.get('X-SHA256');
+      const content_type = request.headers.get('Content-Type') === 'video/mp4' ? 'video/mp4' : 'image/jpeg';
       let record = await store.get(key);
-      if (record && (record.sha256 !== sha || record.size !== bytes.byteLength)) throw new HttpError(409, 'Photo ID already belongs to different bytes.');
+      if (record && (record.sha256 !== sha || record.size !== bytes.byteLength || (record.content_type || 'image/jpeg') !== content_type)) throw new HttpError(409, 'Photo ID already belongs to different bytes.');
       if (record?.state === 'deleting' || record?.state === 'deleted') throw new HttpError(410, 'This photo was explicitly deleted. Do not upload it again.');
       if (record?.state === 'ready') return json({ id, stored: true, sha256: sha });
       await this.spend('writes');
       if (!record) {
-        record = { id, size: bytes.byteLength, sha256: sha, captured_at: request.headers.get('X-Captured-At'), timestamp_kind: request.headers.get('X-Timestamp-Kind') || 'capture', uploaded_at: new Date().toISOString(), state: 'pending' };
+        record = { id, content_type, size: bytes.byteLength, sha256: sha, captured_at: request.headers.get('X-Captured-At'), timestamp_kind: request.headers.get('X-Timestamp-Kind') || 'capture', uploaded_at: new Date().toISOString(), state: 'pending' };
         await store.transaction(async tx => {
           const totals = reserve(await tx.get('totals'), bytes.byteLength);
           await tx.put({ totals, [key]: record });
@@ -173,7 +177,7 @@ export class Gallery {
       // Same ID retries overwrite the same key and reuse the reservation.
       // The Worker hashed the received bytes. Acknowledge only after Supabase
       // confirms storage and the metadata transaction commits.
-      await this.photos.put(id, bytes);
+      await this.photos.put(id, bytes, record.content_type);
       record.state = 'ready';
       await store.transaction(async tx => {
         await tx.put(key, record);
@@ -189,7 +193,7 @@ export class Gallery {
       const images = [];
       for (const [, id] of entries.slice(0, 20)) {
         const record = await store.get('photo:' + id);
-        if (record?.state === 'ready') images.push({ id, captured_at: record.captured_at, timestamp_kind: record.timestamp_kind || 'capture', uploaded_at: record.uploaded_at, data: `/api/images/${id}` });
+        if (record?.state === 'ready') images.push({ id, content_type: record.content_type || 'image/jpeg', captured_at: record.captured_at, timestamp_kind: record.timestamp_kind || 'capture', uploaded_at: record.uploaded_at, data: `/api/images/${id}` });
       }
       return json({ images, next: entries.length > 20 ? entries[19][0] : null });
     }
@@ -201,7 +205,7 @@ export class Gallery {
       if (this.env.GALLERY_ONLY !== 'true' && await store.get('game:card:' + id)) throw new HttpError(409, 'This photo is a collectible. Retire the card in Headquarters instead of deleting its photo.');
       record.state = 'deleting'; await store.put(key, record);
       await this.spend('deletes');
-      await this.photos.delete(id);
+      await this.photos.delete(id, record.content_type);
       await store.transaction(async tx => {
         const totals = await tx.get('totals');
         if (!totals || totals.bytes < record.size || totals.objects < 1) throw new Error('Ledger inconsistency');
@@ -216,8 +220,8 @@ export class Gallery {
     }
     if (record.state !== 'ready') throw new HttpError(409, 'Upload pending or deletion in progress.');
     await this.spend('reads', record.size + 8192);
-    const object = await this.photos.get(id);
+    const object = await this.photos.get(id, record.content_type);
     if (!object) throw new HttpError(503, 'Stored photo is temporarily unavailable.');
-    return new Response(object.body, { headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'private, max-age=3600', 'X-Content-Type-Options': 'nosniff' } });
+    return new Response(object.body, { headers: { 'Content-Type': record.content_type || 'image/jpeg', 'Cache-Control': 'private, max-age=3600', 'X-Content-Type-Options': 'nosniff' } });
   }
 }
