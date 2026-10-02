@@ -10,7 +10,7 @@ if [[ -z "${PHOTO_STREAM_SDK:-}" && -d /Library/Developer/CommandLineTools/SDKs/
   SDK=/Library/Developer/CommandLineTools/SDKs/MacOSX15.4.sdk
 fi
 for ARCH in arm64 x86_64; do
-  swiftc -sdk "$SDK" -parse-as-library -swift-version 5 -O -module-cache-path "$PWD/build/module-cache" -target "$ARCH-apple-macos13.0" PhotoStream.swift ScreenShare.swift -o "build/Sclshi-$ARCH"
+  swiftc -sdk "$SDK" -parse-as-library -swift-version 5 -O -module-cache-path "$PWD/build/module-cache" -target "$ARCH-apple-macos13.0" PhotoStream.swift ScreenShare.swift DevicePresence.swift -o "build/Sclshi-$ARCH"
 done
 lipo -create build/Sclshi-arm64 build/Sclshi-x86_64 -output "$APP/Contents/MacOS/Sclshi"
 cp screen-peer.html "$APP/Contents/Resources/screen-peer.html"
@@ -19,7 +19,7 @@ cp ../photo_upload.py "$APP/Contents/Resources/photo_upload.py"
 import plistlib,sys
 from pathlib import Path
 app=Path(sys.argv[1])
-data={'CFBundleDisplayName':'Sclshi','CFBundleName':'Sclshi','CFBundleExecutable':'Sclshi','CFBundleIdentifier':'com.gaberose.photostream.menubar','CFBundlePackageType':'APPL','CFBundleVersion':'5','CFBundleShortVersionString':'5.0','LSMinimumSystemVersion':'13.0','LSUIElement':True,'NSLocalNetworkUsageDescription':'Connect your shared screen directly to your gallery admin on the same local network.','NSCameraUsageDescription':'Welcome to Sclshi!'}
+data={'CFBundleDisplayName':'Sclshi','CFBundleName':'Sclshi','CFBundleExecutable':'Sclshi','CFBundleIdentifier':'com.gaberose.photostream.menubar','CFBundlePackageType':'APPL','CFBundleVersion':'6','CFBundleShortVersionString':'6.0','LSMinimumSystemVersion':'13.0','LSUIElement':True,'NSLocalNetworkUsageDescription':'Connect your shared screen directly to your gallery admin on the same local network.','NSCameraUsageDescription':'Welcome to Sclshi!'}
 with (app/'Contents/Info.plist').open('wb') as f:plistlib.dump(data,f)
 PY
 codesign --force --sign - "$APP"

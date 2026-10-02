@@ -48,3 +48,46 @@ exclusive roles, signaling exchange and rejection of screen-frame messages by
 Cloudflare, using local synthetic data. `bash menu-bar/build.sh` compiles both Mac
 architectures without launching capture. Actual permission prompts and a live
 connection between two different Macs need a per-device acceptance check.
+
+## Device status and native screen control (Sclshi 6)
+
+The admin gallery's **Devices** tab lists Macs running Sclshi 6 or later. Each app
+sends a small heartbeat approximately once per minute, independent of screen sharing.
+The server stamps its receipt time, so an incorrect device clock cannot make a Mac
+appear online forever. **Online** means a check-in within 150 seconds; **Offline /
+asleep** means no recent check-in, not proof the computer is powered off. Closing
+Sclshi also makes it appear offline, even if SSH still works. The visible tab refreshes
+once a minute. Device status is not available to gallery members.
+
+The app stores a persistent random ID in `~/Pictures/PhotoStream/device-id.txt` and
+reports the Mac's computer name, app version, browser-sharing enabled state, and
+Tailscale IPv4 address when the installed Tailscale CLI supplies one. No usernames,
+passwords, screen frames, or location history are included. The address is checked
+at most every five minutes. If it is missing initially, allow another check-in.
+Latest diagnostic: `cat ~/Pictures/PhotoStream/device-status.txt`.
+
+**Control Mac** opens a `vnc://100.x.x.x` link in the viewing Mac's built-in Screen
+Sharing app. This is native mouse/keyboard control over Tailscale, separate from the
+browser's view-only WebRTC page. Screen Sharing must be enabled on the target Mac:
+
+1. System Settings → General → Sharing → Screen Sharing.
+2. Enable the service and allow only your Mac user account.
+3. Keep Tailscale connected on both computers.
+4. In the gallery, open Devices → Control Mac. Approve your browser's request to
+   open Screen Sharing, if shown, and authenticate with the target Mac's credentials.
+
+Use **Copy address** and paste into Screen Sharing or Finder's Connect to Server
+if the browser doesn't open the link. A manual Terminal equivalent on the viewing
+Mac is `open 'vnc://YOUR_TAILSCALE_IP'`. No Mac credentials are stored by the website.
+This requires a viewing Mac; it is not an in-browser control feature.
+
+Normal macOS sharing indicators and permissions remain. Close the Screen Sharing
+connection window to disconnect. Turn the target Mac's Screen Sharing service off
+to disable native access. Sclshi's Stop screen sharing menu controls only its own
+browser stream. No power/sleep settings are changed, and no remote service is
+silently enabled by installing Sclshi. The target still must be awake and reachable.
+
+Presence is capped at 10 registered devices and 16,000 accepted updates/day globally.
+Repeated updates within 45 seconds are coalesced without writes. Only each device's
+latest state and one daily budget counter are stored in the existing LiveRoom object.
+Native control traffic travels through Tailscale, not Cloudflare or Supabase.

@@ -2,6 +2,27 @@
 export class LiveRoom {
   constructor(ctx) { this.ctx = ctx; }
   async fetch(request) {
+    const url=new URL(request.url);
+    if(url.pathname==='/devices'&&request.method==='GET') {
+      const rows=await this.ctx.storage.list({prefix:'device:',limit:10});const now=Date.now();
+      return Response.json({devices:[...rows.values()].map(d=>({...d,online:now-d.lastSeen<150000})),serverTime:now},{headers:{'Cache-Control':'no-store'}});
+    }
+    if(url.pathname==='/heartbeat'&&request.method==='POST') {
+      const d=await request.json();
+      if(!/^[a-f0-9-]{36}$/.test(d.id||'')||typeof d.name!=='string'||!d.name.trim()||d.name.length>80||typeof d.sharing!=='boolean')return Response.json({error:'Invalid device.'},{status:400});
+      if(d.tailscaleIP!==null&&(!/^100\.(?:\d{1,3}\.){2}\d{1,3}$/.test(d.tailscaleIP||'')||d.tailscaleIP.split('.').some(n=>Number(n)>255)||Number(d.tailscaleIP.split('.')[1])<64||Number(d.tailscaleIP.split('.')[1])>127))return Response.json({error:'Invalid Tailscale address.'},{status:400});
+      return this.ctx.blockConcurrencyWhile(async()=>{
+        const key='device:'+d.id,previous=await this.ctx.storage.get(key),now=Date.now();
+        if(previous&&now-previous.lastSeen<45000)return new Response(null,{status:204});
+        if(!previous&&(await this.ctx.storage.list({prefix:'device:',limit:10})).size>=10)return Response.json({error:'Device limit reached (10).'}, {status:409});
+        const day=new Date(now).toISOString().slice(0,10);let budget=await this.ctx.storage.get('heartbeat-budget');
+        if(!budget||budget.day!==day)budget={day,count:0};
+        if(budget.count>=16000)return Response.json({error:'Daily device check-in limit reached.'},{status:429});
+        budget.count++;
+        await this.ctx.storage.put({[key]:{id:d.id,name:d.name.trim(),lastSeen:now,sharing:d.sharing,tailscaleIP:d.tailscaleIP,version:typeof d.version==='string'?d.version.slice(0,16):''},'heartbeat-budget':budget});
+        return new Response(null,{status:204});
+      });
+    }
     const role=request.headers.get('X-Live-Role');
     if(!['source','viewer'].includes(role)||request.headers.get('Upgrade')?.toLowerCase()!=='websocket')return new Response('Invalid connection',{status:400});
     return this.ctx.blockConcurrencyWhile(async()=>{

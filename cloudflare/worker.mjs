@@ -58,6 +58,23 @@ export default {
       // over Basic credentials cached by browsers from the original gallery.
       const hasGameCookie = /(?:^|;\s*)__Host-sclshi=/.test(request.headers.get('Cookie') || '');
       if (!upload && (hasGameCookie || !allowed)) allowed = (await readSession(request, env))?.role === 'admin';
+      if(url.pathname==='/api/devices/heartbeat') {
+        if(request.method!=='POST')return json({error:'Method not allowed.'},405);
+        if(!await same(authorization, `Bearer ${env.UPLOAD_TOKEN}`))return json({error:'Device authorization required.'},401);
+        if(request.headers.get('Origin'))return json({error:'Native device required.'},403);
+        if(!request.body)return json({error:'Missing heartbeat.'},400);
+        const reader=request.body.getReader();let size=0;const chunks=[];
+        try { while(true){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>1024){await reader.cancel();return json({error:'Heartbeat too large.'},413);}chunks.push(value);} } finally {reader.releaseLock();}
+        const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}
+        let data;try{data=JSON.parse(new TextDecoder().decode(bytes));}catch{return json({error:'Invalid heartbeat.'},400);}
+        if(!data||Array.isArray(data)||typeof data!=='object'||!validId(data.id))return json({error:'Invalid device.'},400);
+        return env.LIVE.get(env.LIVE.idFromName('screen-v1')).fetch(new Request('https://internal/heartbeat',{method:'POST',body:JSON.stringify(data)}));
+      }
+      if(url.pathname==='/api/devices') {
+        if(!allowed)return json({error:'Admin access required.'},401);
+        if(request.method!=='GET')return json({error:'Method not allowed.'},405);
+        return env.LIVE.get(env.LIVE.idFromName('screen-v1')).fetch(new Request('https://internal/devices'));
+      }
       if(url.pathname==='/api/live/source') {
         if(request.method!=='GET'||!await same(authorization, `Bearer ${env.UPLOAD_TOKEN}`))return json({error:'Source authorization required.'},401);
         if(request.headers.get('Origin'))return json({error:'Native source required.'},403);

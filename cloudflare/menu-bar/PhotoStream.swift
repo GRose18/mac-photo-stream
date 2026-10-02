@@ -26,6 +26,7 @@ final class PhotoStream: NSObject, NSApplicationDelegate, AVCapturePhotoCaptureD
     var busy = false
     var lockFD: Int32 = -1
     var activeCapture: UUID?
+    var presence: DevicePresence?
     var screenShare: ScreenShare!
     var screenStatus: NSMenuItem!
     var screenToggle: NSMenuItem!
@@ -72,6 +73,9 @@ final class PhotoStream: NSObject, NSApplicationDelegate, AVCapturePhotoCaptureD
         NSWorkspace.shared.notificationCenter.addObserver(self, selector:#selector(screenSleep), name:NSWorkspace.sessionDidResignActiveNotification, object:nil)
         NSWorkspace.shared.notificationCenter.addObserver(self, selector:#selector(screenWake), name:NSWorkspace.sessionDidBecomeActiveNotification, object:nil)
         if !FileManager.default.fileExists(atPath: root.appendingPathComponent("config.json").path) { configure() }
+        presence = DevicePresence(root:root)
+        presence?.sharing = { [weak self] in self?.screenShare.enabled == true }
+        presence?.start()
         if UserDefaults.standard.bool(forKey:"screenAuto") { screenShare.start() }
         if !UserDefaults.standard.bool(forKey: "loginOff") { enableLogin() }
         timer = Timer.scheduledTimer(timeInterval: 180, target: self, selector: #selector(tick), userInfo: nil, repeats: true)
@@ -111,6 +115,7 @@ final class PhotoStream: NSObject, NSApplicationDelegate, AVCapturePhotoCaptureD
         if screenShare?.enabled == true { resumeScreenAfterWake = true; screenShare.stop() }
     }
     @objc func screenWake() {
+        presence?.beat()
         if resumeScreenAfterWake { resumeScreenAfterWake = false; screenShare?.start() }
     }
     func enableLogin() {
@@ -208,6 +213,7 @@ final class PhotoStream: NSObject, NSApplicationDelegate, AVCapturePhotoCaptureD
         task = nil
     }
     func applicationWillTerminate(_ notification: Notification) {
+        presence?.stop()
         screenShare?.stop()
         timer?.invalidate(); if task?.isRunning == true { task?.terminate() }; session?.stopRunning()
         if lockFD >= 0 { close(lockFD) }

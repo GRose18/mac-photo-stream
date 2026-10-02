@@ -94,3 +94,10 @@ and compiler mismatch, select a compatible installed SDK with
 
 See [Live screen viewing](../LIVE.md) for setup, permissions and limits. Sharing is
 off until enabled on this Mac. It does not change the three-minute photo schedule.
+
+## Device status
+
+Version 6 checks in once a minute for the admin gallery’s Devices tab and detects
+the installed Tailscale client’s address. See [device status and control](../LIVE.md).
+Native macOS Screen Sharing must be enabled separately for mouse/keyboard control;
+installing Sclshi does not enable it or change sleep settings.

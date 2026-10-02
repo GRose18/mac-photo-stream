@@ -5,7 +5,11 @@ const admin={Authorization:'Basic '+btoa('admin:test-admin')},source={Authorizat
 function messages(ws){const values=[];ws.addEventListener('message',e=>values.push(JSON.parse(e.data)));return values;}
 async function waitFor(fn){for(let i=0;i<100;i++){if(fn())return;await new Promise(r=>setTimeout(r,20));}throw Error('Timed out');}
 try{
- for(const path of ['/live','/api/live/viewer','/api/live/source'])assert.equal((await mf.dispatchFetch('https://test'+path)).status,401);
+ const beat={id:'00000000-0000-4000-8000-000000000001',name:'Synthetic Mac',sharing:false,tailscaleIP:'100.75.53.57',version:'6.0'};
+ assert.equal((await mf.dispatchFetch('https://test/api/devices/heartbeat',{method:'POST',headers:source,body:JSON.stringify(beat)})).status,204);
+ let devices=await mf.dispatchFetch('https://test/api/devices',{headers:admin});assert.equal(devices.status,200);const rows=(await devices.json()).devices;assert.equal(rows.length,1);assert.equal(rows[0].online,true);assert.equal(rows[0].name,'Synthetic Mac');
+ assert.equal((await mf.dispatchFetch('https://test/api/devices',{headers:source})).status,401);
+ for(const path of ['/api/devices','/live','/api/live/viewer','/api/live/source'])assert.equal((await mf.dispatchFetch('https://test'+path)).status,401);
  assert.equal((await mf.dispatchFetch('https://test/api/live/viewer',{headers:{...source,Origin:'https://test',Upgrade:'websocket'}})).status,401);
  assert.equal((await mf.dispatchFetch('https://test/api/live/viewer',{headers:{...admin,Origin:'https://evil.test',Upgrade:'websocket'}})).status,403);
  assert.equal((await mf.dispatchFetch('https://test/api/live/source',{headers:{...source,Origin:'https://test',Upgrade:'websocket'}})).status,403);
