@@ -1,0 +1,8 @@
+<!doctype html><meta charset="utf-8"><script>
+'use strict';let pc,dc;const post=(type,value)=>window.webkit.messageHandlers.live.postMessage({type,value});
+function closePeer(){if(dc)dc.close();dc=null;if(pc)pc.close();pc=null;post('viewing',false);}
+async function gather(peer){if(peer.iceGatheringState==='complete')return;await new Promise((resolve,reject)=>{const t=setTimeout(()=>reject(Error('ICE timeout')),10000);peer.addEventListener('icegatheringstatechange',()=>{if(peer.iceGatheringState==='complete'){clearTimeout(t);resolve();}});});}
+window.signal=async m=>{try{if(m.type==='peer-left'){closePeer();return;}if(m.type==='peer-ready'){closePeer();const peer=pc=new RTCPeerConnection({iceServers:[]});dc=peer.createDataChannel('screen',{ordered:true});dc.onopen=()=>post('viewing',true);dc.onclose=()=>post('viewing',false);peer.onconnectionstatechange=()=>{if(peer===pc&&['failed','disconnected','closed'].includes(peer.connectionState))post('viewing',false);};await peer.setLocalDescription(await peer.createOffer());await gather(peer);if(peer===pc)post('signal',{type:'offer',sdp:peer.localDescription.sdp});}else if(m.type==='answer'&&pc)await pc.setRemoteDescription(m);}catch{closePeer();post('error','Direct connection failed');}};
+window.frame=data=>{if(!dc||dc.readyState!=='open'||dc.bufferedAmount>500000)return;dc.send('begin');for(let i=0;i<data.length;i+=20000)dc.send(data.slice(i,i+20000));dc.send('end');};window.stop=closePeer;
+post('ready',true);
+</script>

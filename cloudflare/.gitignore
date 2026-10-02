@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.wrangler/
+.dev.vars*
+.env*
+*.log
+__pycache__/
+pending/
+
+.credentials.json
+cloudflare-authorization.png
+migration-backup/
+cloudflare-deployed.png
+live-check.mjs
