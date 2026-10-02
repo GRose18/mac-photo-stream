@@ -25,12 +25,26 @@ def cameras(ffmpeg):
 
 
 def record(ffmpeg, device, output):
-    subprocess.run([ffmpeg, '-hide_banner', '-nostdin', '-n', '-f', 'avfoundation',
-                    '-framerate', '30', '-i', device + ':none', '-t', '10', '-an',
+    try:
+        subprocess.run([ffmpeg, '-hide_banner', '-nostdin', '-n', '-f', 'avfoundation',
+                    '-pixel_format', 'nv12', '-framerate', '30',
+                    '-probesize', '32', '-analyzeduration', '0',
+                    '-i', device + ':none', '-t', '10', '-an',
                     '-vf', 'scale=640:-2', '-r', '15', '-c:v', 'libx264',
                     '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-b:v', '450k',
                     '-maxrate', '500k', '-bufsize', '500k', '-movflags', '+faststart',
                     str(output)], check=True, timeout=45)
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(
+            'Camera recording timed out before a complete clip was saved. '
+            'Quit other camera apps and check Terminal camera access in System Settings. '
+            'If using SSH, test directly in Terminal on the camera Mac. '
+            'This attempt was not queued; --retry-only cannot recover it. '
+            'Any partial file remains at ' + str(output)) from exc
+    except subprocess.CalledProcessError as exc:
+        raise RuntimeError(
+            'Camera recording failed; see the FFmpeg message above. '
+            'This attempt was not queued for upload. Any partial file remains at ' + str(output)) from exc
 
 
 def main():
@@ -107,5 +121,5 @@ if __name__ == '__main__':
         raise SystemExit(130)
     except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
         print(str(exc))
-        print('Local files retained. Retry uploads with --retry-only.')
+        print('Local files retained. --retry-only sends only previously completed, queued clips.')
         raise SystemExit(1)
