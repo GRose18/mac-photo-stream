@@ -1,25 +1,24 @@
 # Live screen viewing
 
-Sclshi 5 adds optional live viewing of the Mac's main display. No audio, video
+Sclshi automatically makes the Mac's main display available to the admin Live screen page while the app is running. No audio, video
 recordings, or screen images are saved. Photo capture still runs every three minutes.
 
 ## Setup
 
-1. Quit Sclshi, pull the current source, and run `bash install.sh` in `cloudflare/menu-bar`.
-2. Open `~/Applications/Sclshi.app`. In its menu, enable **Share screen at login**
-   and confirm. This opt-in is per Mac and is off for existing installations until enabled.
+1. Stop Sclshi with `pkill -x Sclshi`, pull the current source, and run `bash install.sh` in `cloudflare/menu-bar`.
+2. Open `~/Applications/Sclshi.app`. Screen sharing starts automatically after setup.
 3. Allow Screen Recording (called Screen & System Audio Recording on some macOS
    versions) and local-network access when macOS requests it. Reopen Sclshi if asked.
    Operating-system permission renewals may still be required.
 4. Confirm Sclshi is enabled in System Settings > General > Login Items.
 5. On the viewing computer, sign in as admin at the gallery, select **Live screen**,
-   then **Connect**. Both devices should be on the same local network.
+   which connects automatically. Both devices should be on the same local network.
 
-The menu shows **Screen sharing** while available and **LIVE** while capturing for
-an attached viewer. **Stop screen sharing** stops the current session. Uncheck
-**Share screen at login** to disable automatic sharing on future launches.
-Sleep and an inactive login session stop the connection; wake/return resumes it
-only if sharing was active. Quit and logout stop sharing. No screen permission or
+The app shows a static `$` with no dropdown menu. Stop the app with `pkill -x Sclshi`
+to stop sharing, or disable its login item to prevent automatic startup.
+The website's **Disconnect** button stops viewing and automatic reconnection until
+**Connect** is clicked or the page is reopened. Sleep and an inactive login session
+stop sharing; wake/return starts it again. Logout stops the app. No screen permission or
 camera access is requested during build or test commands.
 
 ## Limits and behavior
@@ -32,8 +31,9 @@ camera access is requested during build or test commands.
   client isolation, VPNs, firewalls or browser local-network restrictions may block it.
 - Cloudflare exchanges offer/answer connection messages only. The screen frames
   travel over an encrypted peer data channel, never through Supabase/photo storage.
-- Sessions expire after 30 minutes. The source reconnects after a minute; the viewer
-  must click Connect again. This bounds authentication lifetime.
+- Sessions expire after 30 minutes. The source and viewer reconnect automatically
+  with fresh authentication checks. Viewer retries back off from one to five minutes
+  during failures; brief gaps are expected. This bounds authentication lifetime.
 - A separate hibernating SQLite Durable Object has a 500-connection/day limit and
   a 160-message/session cap. It stores only the current day's connection counter;
   signaling attachments expire with the connection. Existing free-plan guards stay.
@@ -83,8 +83,7 @@ This requires a viewing Mac; it is not an in-browser control feature.
 
 Normal macOS sharing indicators and permissions remain. Close the Screen Sharing
 connection window to disconnect. Turn the target Mac's Screen Sharing service off
-to disable native access. Sclshi's Stop screen sharing menu controls only its own
-browser stream. No power/sleep settings are changed, and no remote service is
+to disable native access. Stopping Sclshi stops its own browser stream. No power/sleep settings are changed, and no remote service is
 silently enabled by installing Sclshi. The target still must be awake and reachable.
 
 Presence is capped at 10 registered devices and 16,000 accepted updates/day globally.

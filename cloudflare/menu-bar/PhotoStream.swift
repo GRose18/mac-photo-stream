@@ -85,7 +85,7 @@ final class PhotoStream: NSObject, NSApplicationDelegate, AVCapturePhotoCaptureD
         presence = DevicePresence(root:root)
         presence?.sharing = { [weak self] in self?.screenShare.enabled == true }
         presence?.start()
-        if UserDefaults.standard.bool(forKey:"screenAuto") { screenShare.start() }
+        if !paused { screenShare.start() }
         if !UserDefaults.standard.bool(forKey: "loginOff") { enableLogin() }
         videoTimer = Timer.scheduledTimer(timeInterval: 2, target: self, selector: #selector(checkVideoRequest), userInfo: nil, repeats: true)
         checkVideoRequest()
@@ -129,7 +129,7 @@ final class PhotoStream: NSObject, NSApplicationDelegate, AVCapturePhotoCaptureD
     @objc func screenWake() {
         desktopActive = true
         presence?.beat()
-        if resumeScreenAfterWake { resumeScreenAfterWake = false; screenShare?.start() }
+        if !preview && !paused { resumeScreenAfterWake = false; screenShare?.start() }
     }
     func enableLogin() {
         do { try SMAppService.mainApp.register() } catch { report("Login setup needs attention in System Settings") }
