@@ -10,12 +10,13 @@ if [[ -z "${PHOTO_STREAM_SDK:-}" && -d /Library/Developer/CommandLineTools/SDKs/
   SDK=/Library/Developer/CommandLineTools/SDKs/MacOSX15.4.sdk
 fi
 for ARCH in arm64 x86_64; do
-  swiftc -sdk "$SDK" -parse-as-library -swift-version 5 -O -module-cache-path "$PWD/build/module-cache" -target "$ARCH-apple-macos13.0" PhotoStream.swift ScreenShare.swift DevicePresence.swift CameraVideo.swift -o "build/Sclshi-$ARCH"
+  swiftc -sdk "$SDK" -parse-as-library -swift-version 5 -O -module-cache-path "$PWD/build/module-cache" -target "$ARCH-apple-macos13.0" PhotoStream.swift ScreenShare.swift DevicePresence.swift CameraVideo.swift AiortcBridge.swift -o "build/Sclshi-$ARCH"
 done
 lipo -create build/Sclshi-arm64 build/Sclshi-x86_64 -output "$APP/Contents/MacOS/Sclshi"
 cp screen-peer.html "$APP/Contents/Resources/screen-peer.html"
 cp ../video_upload.py "$APP/Contents/Resources/video_upload.py"
 cp ../sclshi_control.py "$APP/Contents/Resources/sclshi_control.py"
+cp ../aiortc_stream.py "$APP/Contents/Resources/aiortc_stream.py"
 cp ../photo_upload.py "$APP/Contents/Resources/photo_upload.py"
 /usr/bin/python3 - "$APP" <<'PY'
 import plistlib,sys

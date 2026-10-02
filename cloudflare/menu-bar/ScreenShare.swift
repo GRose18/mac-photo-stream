@@ -18,9 +18,21 @@ final class ScreenShare: NSObject, WKScriptMessageHandler, WKNavigationDelegate,
     private let ci = CIContext()
     private let gate = DispatchSemaphore(value: 1)
     private var root: URL
-    init(root: URL) { self.root = root; super.init() }
+    private let aiortcTest: Bool
+    private var aiortc: AiortcBridge?
+    init(root: URL, aiortcTest: Bool = false) {
+        self.root = root; self.aiortcTest = aiortcTest; super.init()
+    }
     func start() {
         guard !enabled else { return }
+        if aiortcTest {
+            let bridge = AiortcBridge(); aiortc = bridge
+            bridge.onStatus = { [weak self] text, active in
+                self?.enabled = active; self?.onStatus(text, active)
+            }
+            bridge.start(root: root)
+            return
+        }
         guard CGPreflightScreenCaptureAccess() else {
             CGRequestScreenCaptureAccess()
             onStatus("Screen permission needed — reopen after allowing", false); return
@@ -36,6 +48,7 @@ final class ScreenShare: NSObject, WKScriptMessageHandler, WKNavigationDelegate,
         web.loadFileURL(file, allowingReadAccessTo: file.deletingLastPathComponent())
     }
     func stop() {
+        aiortc?.stop(); aiortc = nil
         enabled = false; viewing = false; generation = UUID(); starting = false
         reconnect?.cancel(); reconnect = nil
         socket?.cancel(with: .normalClosure, reason: nil); socket = nil

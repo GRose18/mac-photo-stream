@@ -17,6 +17,7 @@ final class PhotoStream: NSObject, NSApplicationDelegate, AVCapturePhotoCaptureD
     let root = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Pictures/PhotoStream")
     let queue = DispatchQueue(label: "com.gaberose.photostream.capture")
     let preview = CommandLine.arguments.contains("--preview") || Bundle.main.object(forInfoDictionaryKey: "PhotoStreamPreview") as? Bool == true
+    let aiortcTest = CommandLine.arguments.contains("--aiortc-test")
     var status: NSStatusItem!
     var timer: Timer?
     var session: AVCaptureSession?
@@ -72,9 +73,10 @@ final class PhotoStream: NSObject, NSApplicationDelegate, AVCapturePhotoCaptureD
         status.menu = nil
         status.isVisible = false
         if preview { report("Preview — camera and uploads disabled"); return }
-        screenShare = ScreenShare(root:root)
+        screenShare = ScreenShare(root:root, aiortcTest:aiortcTest)
         screenShare.onStatus = { [weak self] text, enabled in
             self?.screenStatus.title = text
+            if self?.aiortcTest == true { self?.report(text) }
             self?.screenToggle.title = enabled ? "" : ""
             self?.refreshTitle()
         }
@@ -84,10 +86,14 @@ final class PhotoStream: NSObject, NSApplicationDelegate, AVCapturePhotoCaptureD
         NSWorkspace.shared.notificationCenter.addObserver(self, selector:#selector(screenWake), name:NSWorkspace.sessionDidBecomeActiveNotification, object:nil)
         if !FileManager.default.fileExists(atPath: root.appendingPathComponent("config.json").path) { configure() }
         presence = DevicePresence(root:root)
-        presence?.sharing = { [weak self] in self?.screenShare.enabled == true }
+        presence?.sharing = { [weak self] in self?.aiortcTest == false && self?.screenShare.enabled == true }
         presence?.start()
         if !paused { screenShare.start() }
-        if !UserDefaults.standard.bool(forKey: "loginOff") { enableLogin() }
+        if !aiortcTest && !UserDefaults.standard.bool(forKey: "loginOff") { enableLogin() }
+        if aiortcTest {
+            if paused { report("Setup incomplete — reopen to enter your token") }
+            return
+        }
         videoTimer = Timer.scheduledTimer(timeInterval: 2, target: self, selector: #selector(checkVideoRequest), userInfo: nil, repeats: true)
         checkVideoRequest()
         timer = Timer.scheduledTimer(timeInterval: 180, target: self, selector: #selector(tick), userInfo: nil, repeats: true)
