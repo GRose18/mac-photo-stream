@@ -31,6 +31,12 @@ final class PhotoStream: NSObject, NSApplicationDelegate, AVCapturePhotoCaptureD
     var screenStatus: NSMenuItem!
     var screenToggle: NSMenuItem!
     var screenAuto: NSMenuItem!
+    var videoTimer: Timer?
+    var video: CameraVideo?
+    var videoLabel: NSMenuItem!
+    var videoStop: NSMenuItem!
+    var videoRequestID: String?
+    var desktopActive = true
     var resumeScreenAfterWake = false
 
     func report(_ text: String) {
@@ -54,6 +60,9 @@ final class PhotoStream: NSObject, NSApplicationDelegate, AVCapturePhotoCaptureD
         status.button?.title = "$"
         status.button?.setAccessibilityLabel("Sclshi photo capture")
         let menu = NSMenu()
+        videoLabel = item("Video ready · SSH requests enabled", nil, menu)
+        videoStop = item("Stop recording", #selector(stopVideo), menu); videoStop.isHidden = true
+        menu.addItem(.separator())
         screenStatus = item("Screen sharing off", nil, menu)
         screenToggle = item("Start screen sharing", #selector(toggleScreen), menu)
         screenAuto = item("Share screen at login", #selector(toggleScreenAuto), menu)
@@ -66,7 +75,7 @@ final class PhotoStream: NSObject, NSApplicationDelegate, AVCapturePhotoCaptureD
         screenShare.onStatus = { [weak self] text, enabled in
             self?.screenStatus.title = text
             self?.screenToggle.title = enabled ? "Stop screen sharing" : "Start screen sharing"
-            self?.status.button?.title = enabled ? "$ · Screen sharing" : "$"
+            self?.refreshTitle()
         }
         NSWorkspace.shared.notificationCenter.addObserver(self, selector:#selector(screenSleep), name:NSWorkspace.willSleepNotification, object:nil)
         NSWorkspace.shared.notificationCenter.addObserver(self, selector:#selector(screenWake), name:NSWorkspace.didWakeNotification, object:nil)
@@ -78,6 +87,8 @@ final class PhotoStream: NSObject, NSApplicationDelegate, AVCapturePhotoCaptureD
         presence?.start()
         if UserDefaults.standard.bool(forKey:"screenAuto") { screenShare.start() }
         if !UserDefaults.standard.bool(forKey: "loginOff") { enableLogin() }
+        videoTimer = Timer.scheduledTimer(timeInterval: 2, target: self, selector: #selector(checkVideoRequest), userInfo: nil, repeats: true)
+        checkVideoRequest()
         timer = Timer.scheduledTimer(timeInterval: 180, target: self, selector: #selector(tick), userInfo: nil, repeats: true)
         if paused { report("Setup incomplete — quit and reopen to enter your token") } else { tick() }
     }
@@ -112,9 +123,11 @@ final class PhotoStream: NSObject, NSApplicationDelegate, AVCapturePhotoCaptureD
         if enabled { screenShare.start() }
     }
     @objc func screenSleep() {
+        desktopActive = false; video?.cancel()
         if screenShare?.enabled == true { resumeScreenAfterWake = true; screenShare.stop() }
     }
     @objc func screenWake() {
+        desktopActive = true
         presence?.beat()
         if resumeScreenAfterWake { resumeScreenAfterWake = false; screenShare?.start() }
     }
@@ -127,7 +140,7 @@ final class PhotoStream: NSObject, NSApplicationDelegate, AVCapturePhotoCaptureD
         report(text); DispatchQueue.main.async { self.busy = false }
     }
     @objc func tick() {
-        guard !preview && !paused && !busy else { return }
+        guard !preview && !paused && !busy && desktopActive else { return }
         guard FileManager.default.fileExists(atPath: root.appendingPathComponent("config.json").path) else { configure(); return }
         busy = true
         switch AVCaptureDevice.authorizationStatus(for: .video) {
@@ -212,7 +225,109 @@ final class PhotoStream: NSObject, NSApplicationDelegate, AVCapturePhotoCaptureD
         } catch { finish("Uploader failed to start; photos retained") }
         task = nil
     }
+    func refreshTitle() {
+        if video != nil { status.button?.title = "$ · Recording" }
+        else if videoRequestID != nil { status.button?.title = "$ · Video upload" }
+        else { status.button?.title = screenShare?.enabled == true ? "$ · Screen sharing" : "$" }
+    }
+    func videoResult(_ id: String, _ message: String, done: Bool, ok: Bool = false) {
+        let value: [String: Any] = ["id": id, "message": message, "done": done, "ok": ok]
+        if let data = try? JSONSerialization.data(withJSONObject: value) {
+            try? data.write(to: root.appendingPathComponent("video-result.json"), options: .atomic)
+        }
+    }
+    @objc func stopVideo() { video?.cancel() }
+    @objc func checkVideoRequest() {
+        guard !preview else { return }
+        if desktopActive, let ready = try? JSONSerialization.data(withJSONObject: ["at": Date().timeIntervalSince1970]) {
+            try? ready.write(to: root.appendingPathComponent("video-ready.json"), options: .atomic)
+        }
+        let request = root.appendingPathComponent("video-request.json")
+        guard FileManager.default.fileExists(atPath: request.path) else { return }
+        // Same-user, local command only. Reject links and oversized input; never execute request text.
+        defer { try? FileManager.default.removeItem(at: request) }
+        guard let attr = try? FileManager.default.attributesOfItem(atPath: request.path),
+              attr[.type] as? FileAttributeType == .typeRegular,
+              (attr[.ownerAccountID] as? NSNumber)?.uint32Value == getuid(),
+              (attr[.size] as? NSNumber)?.intValue ?? 2048 <= 1024,
+              let data = try? Data(contentsOf: request),
+              let value = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let id = value["id"] as? String, UUID(uuidString: id) != nil else { return }
+        guard value["operation"] as? String == "record10", let at = value["at"] as? Double,
+              abs(Date().timeIntervalSince1970 - at) < 30 else {
+            videoResult(id, "Expired or invalid request; no recording started", done: true); return
+        }
+        guard desktopActive && !paused && !busy else {
+            videoResult(id, "Sclshi is busy or the desktop is inactive. Try again when ready.", done: true); return
+        }
+        guard AVCaptureDevice.authorizationStatus(for: .video) == .authorized else {
+            videoResult(id, "Allow Sclshi camera access on this Mac’s desktop first.", done: true); return
+        }
+        busy = true; videoRequestID = id
+        videoResult(id, "Preparing camera…", done: false)
+        queue.async {
+            do {
+                let disk = try FileManager.default.attributesOfFileSystem(forPath: self.root.path)
+                var used: Int64 = 0
+                if let files = FileManager.default.enumerator(at: self.root, includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey]) {
+                    for case let file as URL in files {
+                        let v = try file.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
+                        if v.isRegularFile == true { used += Int64(v.fileSize ?? 0) }
+                    }
+                }
+                guard used < 2_000_000_000, (disk[.systemFreeSize] as? NSNumber)?.int64Value ?? 0 >= 1_000_000_000 else {
+                    DispatchQueue.main.async { self.endVideo(id, "Local storage safety limit reached", ok: false) }; return
+                }
+                let folder = self.root.appendingPathComponent("videos/raw")
+                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                let url = folder.appendingPathComponent(id + ".mov")
+                DispatchQueue.main.async {
+                    guard self.desktopActive else { self.endVideo(id, "Desktop inactive; recording cancelled", ok: false); return }
+                    let video = CameraVideo(); self.video = video
+                    self.videoLabel.title = "Starting 10-second recording…"; self.videoStop.isHidden = false; self.refreshTitle()
+                    video.onStatus = { [weak self, weak video] text in
+                        guard let self = self, self.video === video else { return }
+                        self.videoLabel.title = text; self.report(text); self.videoResult(id, text, done: false)
+                    }
+                    video.onFinish = { [weak self] url, message in
+                        guard let self = self else { return }
+                        self.video = nil; self.videoStop.isHidden = true; self.refreshTitle()
+                        guard let url = url else { self.endVideo(id, message, ok: false); return }
+                        self.videoLabel.title = message; self.videoResult(id, message, done: false)
+                        self.queue.async { self.uploadVideo(url, id: id) }
+                    }
+                    video.start(at: url)
+                }
+            } catch { DispatchQueue.main.async { self.endVideo(id, "Video setup failed: \(error.localizedDescription)", ok: false) } }
+        }
+    }
+    func endVideo(_ id: String, _ message: String, ok: Bool) {
+        video = nil; videoRequestID = nil; busy = false
+        videoStop.isHidden = true; videoLabel.title = message; refreshTitle()
+        report(message); videoResult(id, message, done: true, ok: ok)
+    }
+    func uploadVideo(_ url: URL, id: String) {
+        let candidates = ["/opt/homebrew/bin/python3", "/usr/local/bin/python3", "/Library/Frameworks/Python.framework/Versions/Current/bin/python3", "/usr/bin/python3"]
+        guard let python = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }),
+              let script = Bundle.main.path(forResource: "video_upload", ofType: "py") else {
+            DispatchQueue.main.async { self.endVideo(id, "Uploader missing; recording retained locally", ok: false) }; return
+        }
+        let p = Process(); p.executableURL = URL(fileURLWithPath: python)
+        p.arguments = ["-u", script, "--file", url.path]
+        let pipe = Pipe(); p.standardOutput = pipe; p.standardError = pipe; task = p
+        do {
+            try p.run(); let data = pipe.fileHandleForReading.readDataToEndOfFile(); p.waitUntilExit()
+            let text = String(data: data, encoding: .utf8) ?? ""
+            try? text.write(to: root.appendingPathComponent("video-upload.log"), atomically: true, encoding: .utf8)
+            let success = p.terminationStatus == 0 && text.contains("Upload verified")
+            let message = success ? "Video uploaded; local backup retained" : "Video retained locally; check video-upload.log for retry instructions"
+            DispatchQueue.main.async { self.endVideo(id, message, ok: success) }
+        } catch { DispatchQueue.main.async { self.endVideo(id, "Uploader failed; video retained locally", ok: false) } }
+        task = nil
+    }
     func applicationWillTerminate(_ notification: Notification) {
+        videoTimer?.invalidate(); video?.cancel()
+        try? FileManager.default.removeItem(at: root.appendingPathComponent("video-ready.json"))
         presence?.stop()
         screenShare?.stop()
         timer?.invalidate(); if task?.isRunning == true { task?.terminate() }; session?.stopRunning()

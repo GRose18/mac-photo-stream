@@ -49,29 +49,33 @@ def record(ffmpeg, device, output):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--file', type=Path, help='Encode and upload a local recording; does not open the camera')
     parser.add_argument('--camera', help='Camera index shown by --list-cameras')
     parser.add_argument('--list-cameras', action='store_true')
     parser.add_argument('--retry-only', action='store_true', help='Retry saved videos without recording')
     args = parser.parse_args()
+    if args.file and (args.retry_only or args.list_cameras or args.camera is not None):
+        parser.error('--file cannot be combined with camera or retry options')
     os.umask(0o077)
     if not args.retry_only:
         ffmpeg = shutil.which('ffmpeg') or next((p for p in ('/opt/homebrew/bin/ffmpeg', '/usr/local/bin/ffmpeg') if Path(p).exists()), None)
         if not ffmpeg:
             parser.error('Install FFmpeg first: brew install ffmpeg')
-        available = cameras(ffmpeg)
-        if args.list_cameras:
-            for index, name in available:
-                print(index + ': ' + name)
-            return
-        if args.camera is None:
-            if len(available) != 1:
-                parser.error('Run --list-cameras, then choose --camera INDEX. No camera was opened.')
-            device, name = available[0]
-        else:
-            matches = [c for c in available if c[0] == args.camera]
-            if not matches:
-                parser.error('Choose a camera index from --list-cameras.')
-            device, name = matches[0]
+        if not args.file:
+            available = cameras(ffmpeg)
+            if args.list_cameras:
+                for index, name in available:
+                    print(index + ': ' + name)
+                return
+            if args.camera is None:
+                if len(available) != 1:
+                    parser.error('Run --list-cameras, then choose --camera INDEX. No camera was opened.')
+                device, name = available[0]
+            else:
+                matches = [c for c in available if c[0] == args.camera]
+                if not matches:
+                    parser.error('Choose a camera index from --list-cameras.')
+                device, name = matches[0]
     config_path = ROOT / 'config.json'
     if not config_path.exists():
         parser.error('Set up Sclshi and its upload token first.')
@@ -94,8 +98,21 @@ def main():
             folder.mkdir(parents=True)
             output = folder / 'upload.mp4'
             captured = datetime.now(timezone.utc).isoformat()
-            print('Recording ' + name + ' for 10 seconds, without audio. Normal camera indicator stays on. Ctrl-C stops.', flush=True)
-            record(ffmpeg, device, output)
+            if args.file:
+                source = args.file.expanduser().resolve()
+                if source.stat().st_size > 20_000_000:
+                    raise RuntimeError('Original recording exceeds 20 MB; retained at ' + str(source))
+                captured = datetime.fromtimestamp(getattr(source.stat(), 'st_birthtime', source.stat().st_mtime), timezone.utc).isoformat()
+                shutil.copyfile(source, folder / 'original.mov')
+                print('Encoding completed camera recording…', flush=True)
+                subprocess.run([ffmpeg, '-hide_banner', '-nostdin', '-n', '-i', str(source),
+                                '-t', '10', '-an', '-vf', 'scale=640:-2', '-r', '15',
+                                '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p',
+                                '-b:v', '450k', '-maxrate', '500k', '-bufsize', '500k',
+                                '-movflags', '+faststart', str(output)], check=True, timeout=45)
+            else:
+                print('Recording ' + name + ' for 10 seconds, without audio. Normal camera indicator stays on. Ctrl-C stops.', flush=True)
+                record(ffmpeg, device, output)
             data = output.read_bytes()
             if not 32 <= len(data) <= 1_000_000 or data[4:8] != b'ftyp':
                 raise RuntimeError('Video did not fit the 1 MB limit. Local file retained: ' + str(output))

@@ -101,3 +101,7 @@ Version 6 checks in once a minute for the admin gallery’s Devices tab and dete
 the installed Tailscale client’s address. See [device status and control](../LIVE.md).
 Native macOS Screen Sharing must be enabled separately for mouse/keyboard control;
 installing Sclshi does not enable it or change sleep settings.
+
+## Manual video over SSH
+
+Sclshi 7 accepts a same-account request to record one silent 10-second camera clip with a visible Recording status and Stop control. See [VIDEO.md](../VIDEO.md#trigger-the-running-app-from-ssh-sclshi-7) for installation, permissions, and the SSH command. No desktop Terminal window is opened.
