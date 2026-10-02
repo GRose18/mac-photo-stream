@@ -6,5 +6,5 @@ PYTHON="${SCLSHI_PYTHON:-python3}"
 RUNTIME="$HOME/Library/Application Support/Sclshi/aiortc-venv"
 "$PYTHON" -m venv "$RUNTIME"
 "$RUNTIME/bin/python" -m pip install --only-binary=:all: -r ../requirements-aiortc.txt
-"$RUNTIME/bin/python" -c 'import aiortc, aiohttp, av; print("aiortc runtime ready")'
+"$RUNTIME/bin/python" -c 'import aiortc, aiohttp, av, certifi; print("aiortc runtime ready")'
 echo 'Runtime installed. Launch Sclshi with --aiortc-test to test generated video.'

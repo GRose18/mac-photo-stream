@@ -20,6 +20,14 @@ try{
  await waitFor(()=>am.some(m=>m.type==='peer-ready'));
  a.send(JSON.stringify({type:'offer',sdp:'synthetic offer'}));await waitFor(()=>bm.some(m=>m.sdp==='synthetic offer'));
  b.send(JSON.stringify({type:'answer',sdp:'synthetic answer'}));await waitFor(()=>am.some(m=>m.sdp==='synthetic answer'));
+ r=await mf.dispatchFetch('https://test/api/live/source?mode=aiortc-test',{headers:{...source,Upgrade:'websocket'}});assert.equal(r.status,101);const testSource=r.webSocket;const tm=messages(testSource);testSource.accept();sockets.push(testSource);
+ r=await mf.dispatchFetch('https://test/api/live/viewer?mode=aiortc-test',{headers:{...admin,Origin:'https://test',Upgrade:'websocket'}});assert.equal(r.status,101);const testViewer=r.webSocket;const tvm=messages(testViewer);testViewer.accept();sockets.push(testViewer);
+ await waitFor(()=>tm.some(m=>m.type==='peer-ready'));
+ assert.equal((await mf.dispatchFetch('https://test/api/live/source?mode=aiortc-test',{headers:{...source,Upgrade:'websocket'}})).status,409);
+ testSource.send(JSON.stringify({type:'offer',sdp:'test-only offer'}));await waitFor(()=>tvm.some(m=>m.sdp==='test-only offer'));
+ assert.ok(!bm.some(m=>m.sdp==='test-only offer'));
+ testViewer.send(JSON.stringify({type:'answer',sdp:'test-only answer'}));await waitFor(()=>tm.some(m=>m.sdp==='test-only answer'));assert.ok(!am.some(m=>m.sdp==='test-only answer'));
+ testSource.close();await waitFor(()=>tvm.some(m=>m.type==='peer-left'));assert.ok(!bm.some(m=>m.type==='peer-left'));
  let closed=false;a.addEventListener('close',()=>closed=true);a.send(JSON.stringify({type:'frame',data:'forbidden'}));await waitFor(()=>closed);
  console.log('Live signaling: authentication, origin checks, role exclusivity, offer/answer forwarding and frame rejection passed.');
 }finally{for(const ws of sockets)try{ws.close();}catch{}await mf.dispose();}

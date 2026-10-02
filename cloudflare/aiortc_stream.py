@@ -6,9 +6,11 @@ import json
 import os
 from pathlib import Path
 import signal
+import ssl
 from urllib.parse import urlsplit, urlunsplit
 
 import aiohttp
+import certifi
 from aiortc import RTCConfiguration, RTCPeerConnection, RTCSessionDescription, VideoStreamTrack
 from av import VideoFrame
 
@@ -36,7 +38,7 @@ def configuration(root):
     token = data['token']
     if url.scheme != 'https' or not url.hostname or url.username or url.password or not isinstance(token, str) or not token:
         raise ValueError('Invalid saved configuration')
-    return urlunsplit(('wss', url.netloc, '/api/live/source', '', '')), token
+    return urlunsplit(('wss', url.netloc, '/api/live/source', 'mode=aiortc-test', '')), token
 
 
 class Sender:
@@ -78,7 +80,8 @@ async def serve(root):
     sender = Sender()
     delay = 60
     timeout = aiohttp.ClientTimeout(total=None, sock_connect=15)
-    async with aiohttp.ClientSession(timeout=timeout) as session:
+    connector = aiohttp.TCPConnector(ssl=ssl.create_default_context(cafile=certifi.where()))
+    async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
         try:
             while True:
                 try:
@@ -98,14 +101,17 @@ async def serve(root):
                         if socket.close_code == 1008:
                             print('Signaling rejected; stopping. Check configuration.', flush=True)
                             return
+                except aiohttp.ClientConnectorCertificateError:
+                    print("TLS certificate verification failed; update the aiortc runtime certificate bundle.", flush=True)
+                    return
                 except aiohttp.WSServerHandshakeError as exc:
                     if exc.status in (401, 403):
                         print('Authorization failed; check saved configuration.', flush=True)
                         return
                     print(f'Signaling unavailable (HTTP {exc.status}); retrying.', flush=True)
-                except (aiohttp.ClientError, asyncio.TimeoutError, ValueError, OSError):
-                    # Do not log exception details, which may include credentials or SDP.
-                    print('Connection interrupted; retrying.', flush=True)
+                except (aiohttp.ClientError, asyncio.TimeoutError, ValueError, OSError) as exc:
+                    # Log the exception class only; messages may contain credentials or SDP.
+                    print(f"Connection interrupted ({type(exc).__name__}); retrying.", flush=True)
                 finally:
                     await sender.close()
                 await asyncio.sleep(delay)

@@ -20,7 +20,7 @@ bash install.sh
 open "$HOME/Applications/Sclshi.app" --args --aiortc-test
 ```
 
-Open the website's admin **Live screen** page. It connects automatically, or click
+Open the website's admin **aiortc test** page at `/live?mode=aiortc-test`. It connects automatically, or click
 **Connect** if previously disconnected. Expect a colored pattern with a moving
 bright bar and the label **aiortc test pattern (not your screen)**. The two devices
 must be directly reachable, usually on the same local network. Local-network
@@ -28,7 +28,8 @@ permission or firewall settings can affect connectivity. If macOS asks whether t
 Python runtime may accept incoming network connections, allow it for this test. There is no STUN/TURN
 relay, so this is not a promise of connectivity across arbitrary networks.
 
-Only one source and viewer are supported. Stop any other sharing Mac first. The
+Only one source and viewer per channel are supported. The test channel is separate
+from normal screen sharing; both share the same daily connection budget. The
 existing saved upload configuration is used for source authentication; the viewer
 still needs admin authentication. No credentials are embedded in URLs or logged.
 The existing 30-minute sessions and connection budget remain in force. Reconnects

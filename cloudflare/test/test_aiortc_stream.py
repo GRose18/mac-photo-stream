@@ -20,7 +20,7 @@ class ConfigurationTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     configuration(root)
             (root / 'config.json').write_text(json.dumps({'url': 'https://example.test', 'token': 'test'}))
-            self.assertEqual(configuration(root), ('wss://example.test/api/live/source', 'test'))
+            self.assertEqual(configuration(root), ('wss://example.test/api/live/source?mode=aiortc-test', 'test'))
 
 
 class TransportTests(unittest.IsolatedAsyncioTestCase):

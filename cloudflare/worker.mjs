@@ -80,14 +80,14 @@ export default {
       if(url.pathname==='/api/live/source') {
         if(request.method!=='GET'||!await same(authorization, `Bearer ${env.UPLOAD_TOKEN}`))return json({error:'Source authorization required.'},401);
         if(request.headers.get('Origin'))return json({error:'Native source required.'},403);
-        return env.LIVE.get(env.LIVE.idFromName('screen-v1')).fetch(new Request('https://internal/',{headers:{Upgrade:request.headers.get('Upgrade')||'', 'X-Live-Role':'source'}}));
+        return env.LIVE.get(env.LIVE.idFromName('screen-v1')).fetch(new Request('https://internal/',{headers:{Upgrade:request.headers.get('Upgrade')||'', 'X-Live-Role':'source','X-Live-Channel':url.searchParams.get('mode')==='aiortc-test'?'aiortc-test':'screen'}}));
       }
       if(url.pathname==='/live'||url.pathname==='/api/live/viewer') {
         if(!allowed)return json({error:'Sign in as admin in the gallery first.'},401);
         if(request.method!=='GET')return json({error:'Method not allowed.'},405);
         if(url.pathname==='/live')return new Response(LIVE_HTML,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; media-src blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'"}});
         if(request.headers.get('Origin')!==url.origin)return json({error:'Same-origin action required.'},403);
-        return env.LIVE.get(env.LIVE.idFromName('screen-v1')).fetch(new Request('https://internal/',{headers:{Upgrade:request.headers.get('Upgrade')||'', 'X-Live-Role':'viewer'}}));
+        return env.LIVE.get(env.LIVE.idFromName('screen-v1')).fetch(new Request('https://internal/',{headers:{Upgrade:request.headers.get('Upgrade')||'', 'X-Live-Role':'viewer','X-Live-Channel':url.searchParams.get('mode')==='aiortc-test'?'aiortc-test':'screen'}}));
       }
       const game = url.pathname.startsWith('/api/game/') || url.pathname.startsWith('/api/auth/');
       if (game) {

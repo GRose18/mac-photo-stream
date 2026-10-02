@@ -4,7 +4,7 @@ import vm from 'node:vm';
 import {LIVE_HTML} from '../live-page.mjs';
 function page(extra={}){
  const elements=new Map(),sockets=[],timers=new Map();let timerID=0;
- const context={document:{getElementById(id){if(!elements.has(id))elements.set(id,{disabled:false,hidden:true,removeAttribute(){}});return elements.get(id);}},location:{host:'gallery.test'},WebSocket:class {constructor(url){this.url=url;sockets.push(this);}close(){this.closed=true;}},setTimeout(fn,delay){timers.set(++timerID,{fn,delay});return timerID;},clearTimeout(id){timers.delete(id);},setInterval(){},addEventListener(){},...extra};
+ const context={URLSearchParams,document:{getElementById(id){if(!elements.has(id))elements.set(id,{disabled:false,hidden:true,removeAttribute(){}});return elements.get(id);}},location:{host:'gallery.test'},WebSocket:class {constructor(url){this.url=url;sockets.push(this);}close(){this.closed=true;}},setTimeout(fn,delay){timers.set(++timerID,{fn,delay});return timerID;},clearTimeout(id){timers.delete(id);},setInterval(){},addEventListener(){},...extra};
  vm.runInNewContext(LIVE_HTML.match(/<script>([\s\S]*)<\/script>/)[1],context);
  return {elements,sockets,timers};
 }
@@ -39,4 +39,9 @@ test('RTP video displays frames and clears on disconnect',async()=>{
  frameCallback();assert.equal(video.hidden,false);assert.match(p.elements.get('status').textContent,/test pattern/);
  p.elements.get('stop').onclick();assert.equal(video.hidden,true);assert.equal(video.srcObject,null);
  frameCallback();assert.equal(video.hidden,true);
+});
+
+test('aiortc test page connects to its own source channel',()=>{
+ const p=page({location:{host:'gallery.test',search:'?mode=aiortc-test'}});
+ assert.equal(p.sockets[0].url,'wss://gallery.test/api/live/viewer?mode=aiortc-test');
 });
