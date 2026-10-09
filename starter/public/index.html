@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- PERSONALIZE: browser-tab name -->
+  <title>My Photo Garden</title>
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">A LITTLE PLACE FOR YOUR MEMORIES</p>
+      <!-- PERSONALIZE: page title and welcome sentence -->
+      <h1>My Photo Garden</h1>
+      <p>Good days, little moments, and photos worth keeping.</p>
+    </header>
+    <section id="login-panel" class="card">
+      <h2>Welcome back</h2>
+      <p>Sign in to your private photo library.</p>
+      <form id="login-form">
+        <label for="email">Email address</label>
+        <input id="email" type="email" autocomplete="username" required>
+        <label for="password">Password</label>
+        <input id="password" type="password" autocomplete="current-password" required maxlength="128">
+        <button id="login-button">Sign in</button>
+      </form>
+    </section>
+    <section id="library" hidden>
+      <div class="toolbar"><h2>Your photos</h2><button id="logout" class="secondary">Sign out</button></div>
+      <form id="upload-form" class="card">
+        <label for="photo">Choose a photo from your device</label>
+        <input id="photo" type="file" accept="image/jpeg,image/png,image/webp" required>
+        <p class="hint">JPEG, PNG, or WebP. Maximum 1 MB. Only your account can view your uploads.</p>
+        <button id="upload-button">Upload this photo</button>
+      </form>
+      <div class="toolbar"><p id="empty" hidden>No photos yet. Choose your first photo above.</p><button id="refresh" class="secondary">Refresh photos</button></div>
+      <div id="photos" class="grid"></div>
+      <button id="more" class="secondary" hidden>Load more</button>
+    </section>
+    <p id="status" role="status" aria-live="polite"></p>
+    <!-- PERSONALIZE: footer -->
+    <footer>Made for the moments that matter.</footer>
+  </main>
+</body>
+</html>
