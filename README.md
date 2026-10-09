@@ -7,17 +7,18 @@ You will get:
 - Your own website address ending in `workers.dev`.
 - A sign-in page with a name, colors, and welcome message you can change.
 - A button to choose and upload photos from your device.
+- A customizable **Sclshi Mac app** that signs into this same website and uploads photos you select.
 - A private library for each account: Alice sees Alice’s photos, Bob sees Bob’s.
 
-This beginner starter is a **new, simpler gallery**, not the old Sclshi capture app. It does not automatically take photos, record sound, share screens, create a public album, or give all members access to the same photos. It accepts JPEG, PNG, and WebP images up to 1 MB each. It does not include video, bulk downloads, or website deletion controls.
+This beginner starter includes a **website and a matching Sclshi Mac uploader**. It does not automatically take photos, record sound, share screens, create a public album, or give all members access to the same photos. It accepts JPEG, PNG, and WebP images up to 1 MB each. It does not include video, bulk downloads, or website deletion controls.
 
 **The original hosted Photo Stream website was deleted. These instructions create a new website in your own accounts.** The old implementation is documented separately in [the historical guide](docs/legacy-gallery.md).
 
-## Looking for the Sclshi Mac app?
+## Use Sclshi with this website
 
-Use the separate **[Sclshi installation and setup guide](docs/sclshi-macos.md)** for prerequisites, visible controls, app installation, your own server URL/token, macOS permissions, status checks, stopping, login items, and uninstalling.
+First finish the website steps below. Then follow **[Sclshi: install, personalize, and connect to your website](docs/sclshi-macos.md)**. The matching app source is included in [`starter/macos`](starter/macos/): build it, choose its display name, enter your own website URL, and sign in with the same gallery email/password. Photos selected in the app appear in your website's private library.
 
-**Compatibility matters:** Sclshi uses the historical gallery server, not the new `starter/` website below. The app guide includes a required preparation step because the published historical source hides its menu; it restores accessible controls and a startup consent prompt before installation.
+Use the app in `starter/macos` on `main` for this guide. The historical Sclshi binary uses a different protocol and is not interchangeable with this new version. No old backend or upload-token setup is needed.
 
 ## The two services, in plain English
 
@@ -411,6 +412,20 @@ Refresh your website. If the old design remains, try a hard refresh: Command–S
 
 **Checkpoint:** your live website has your chosen title and colors. Editing HTML alone does not change the website address. Keep the configured Worker name after launch unless you deliberately want a separate deployment.
 
+## Step 14 — Connect your own Sclshi app
+
+The website and Mac app are now one starter project. Follow the **[complete Mac app walkthrough](docs/sclshi-macos.md)** next:
+
+1. Install Apple's Command Line Tools on a Mac running macOS 13 or later.
+2. Open a terminal in `starter/macos`.
+3. Run `bash build.sh`, or `SCLSHI_APP_NAME="My Photo Garden" bash build.sh` to personalize its display name.
+4. Copy `build/Sclshi.app` into your Applications folder and open it.
+5. Enter **your Cloudflare website URL** and the same gallery email/password you created above.
+6. Click **Choose and upload a photo…**, select your file, and confirm the upload.
+7. Open your website, sign into that same account, and refresh the photos.
+
+The app has a normal window and Dock icon. It uploads only files you choose, saves no password to disk, and needs no camera or screen-recording permission. See the app walkthrough for installation details, updates, troubleshooting, and sharing the project with others.
+
 ## Where the complete website and server code live
 
 You can copy the entire `starter` folder into your own project. Keep its structure intact:
@@ -422,6 +437,9 @@ starter/
     style.css              Colors and appearance
     app.js                 Sign-in, upload, and photo-loading buttons
     _headers               Browser security settings
+  macos/
+    Sclshi.swift           Native Mac uploader for this website
+    build.sh               Build and personalize the Mac app
   worker.mjs               Server: verifies users and calls Supabase
   storage-policies.sql     Database access rules to paste into Supabase
   setup.mjs                Interactive project configuration helper

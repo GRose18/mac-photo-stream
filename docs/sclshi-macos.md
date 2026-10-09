@@ -1,270 +1,239 @@
-# Install and set up Sclshi on your Mac
+# Sclshi + your beginner photo website
 
-Sclshi is the native Mac application from this project. This guide explains how to build it, put it in Applications, connect it to your own compatible gallery, grant permissions, check its status, stop it, and remove it.
+This is the Mac app guide for the **new beginner `starter/` website** in this repository. Follow the [main README](../README.md) to create your website, then follow this page to connect Sclshi to it.
 
-**Read this first:** the published historical source does not match its old README. It hides the menu-bar item and leaves some controls unnamed. The preparation step below restores a visible `$` menu, named Start/Stop screen-sharing controls, and **Quit Sclshi**. It adds a confirmation before photo capture on every normal launch, disables automatic login registration, and leaves screen sharing off until you start it. Do not skip that step or use the old installation guide as though those controls already exist.
-
-This guide describes the prepared build, not an assertion about whichever version is already installed on your computer. There is no Dock icon; the prepared build's controls are in the macOS menu bar at the top of the screen.
-
-## 1. Choose the correct website backend
-
-There are now two separate versions in this repository:
-
-| Version | Sign-in and upload system | Works with this Sclshi app? |
-| --- | --- | --- |
-| New `starter/` website on `main` | Supabase user sign-in, `/api/photos`, one library per user | **No.** It needs a different native client integration. |
-| Historical `cloudflare/` server on `codex/durable-photo-storage` | Gallery admin/member sign-in, `/upload`, separate `UPLOAD_TOKEN` | **Yes.** This is the protocol Sclshi uses. |
-
-Changing the app's URL alone cannot make it work with the new starter. A Supabase publishable key is **not** an upload token.
-
-For Sclshi, first deploy your own historical backend using [the historical gallery setup guide](legacy-gallery.md). Complete its private bucket, Worker configuration, `ADMIN_PASSWORD`, `UPLOAD_TOKEN`, and `SUPABASE_SECRET_KEY` steps. Keep its documented limits in mind. Use your own account and project values.
-
-Before continuing, have these two things ready:
-
-- Your new gallery's HTTPS base URL, such as `https://my-gallery.my-account.workers.dev`.
-- The exact `UPLOAD_TOKEN` you saved as a secret on that Worker.
-
-Do not use the original project's old URL: that website was deleted. Do not put the admin password, Supabase secret key, or database password into Sclshi.
-
-## 2. Know what starting the app does
-
-After you press **Start photos**, a normal launch takes an initial camera photo, then approximately one every three minutes while the app is running and awake. It uploads them to the configured gallery and retains local files. macOS camera permission and its camera indicator still apply.
-
-- Screen sharing is a separate, explicit menu action in the prepared build.
-- **Quit Sclshi** stops the app's capture and sharing. Closing a Terminal window does not quit it.
-- Sleep pauses work. Locking the screen is not the same as quitting or logging out.
-- The published app version in this guide does not include the later microphone-recording changes.
-- This is an experimental source build, not a notarized App Store application.
-
-Use it on a Mac whose user has agreed to capture and upload. Make sure anyone whose private activity would be recorded understands what it does.
-
-## 3. Check your Mac and install the build tools
-
-You need macOS 13 or newer, on Apple silicon or Intel.
-
-1. Open **Apple menu → About This Mac** to check the macOS version.
-2. Open **Terminal**: press Command–Space, type Terminal, and press Enter.
-3. Run:
-
-   ```bash
-   xcode-select --install
-   ```
-
-4. Finish Apple's Command Line Tools installer. An “already installed” message is fine.
-5. Check:
-
-   ```bash
-   git --version
-   python3 --version
-   xcrun --find swiftc
-   ```
-
-If Python 3 is missing, install it from [python.org/downloads/macos](https://www.python.org/downloads/macos/), reopen Terminal, and check again. No Python packages are needed for the ordinary photo app. Optional aiortc experiments are outside this installation guide.
-
-**Checkpoint:** all three commands print a version or executable path.
-
-## 4. Download the guide and the compatible app source
-
-These commands use two new folders so the beginner website and older app source do not get mixed together:
-
-```bash
-git clone https://github.com/GRose18/mac-photo-stream.git "$HOME/sclshi-guide"
-git clone --branch codex/durable-photo-storage https://github.com/GRose18/mac-photo-stream.git "$HOME/sclshi-source"
-cd "$HOME/sclshi-source"
-git checkout 9bd77b8
-```
-
-Run one line at a time. If a destination folder already exists, do not delete it blindly. Use a different empty folder name consistently in the following commands, or inspect the existing checkout first.
-
-The pinned revision makes the preparation step reproducible. Git's “detached HEAD” notice is expected here; you are building a specific version rather than editing the latest branch.
-
-**Checkpoint:** `cloudflare/menu-bar/PhotoStream.swift` exists inside `sclshi-source`.
-
-## 5. Prepare visible controls and explicit startup confirmation
-
-Run:
-
-```bash
-python3 "$HOME/sclshi-guide/docs/tools/prepare-visible-sclshi.py" "$HOME/sclshi-source"
-```
-
-This helper:
-
-- Checks that the source exactly matches the documented revision.
-- Restores the visible menu and names its Quit and screen-sharing controls.
-- Shows a local **Start photos / Cancel** prompt before capture begins.
-- Leaves screen sharing off until the user selects Start screen sharing.
-- Removes automatic login registration; you decide whether to add a login item.
-- Removes the setup dialog's hard-coded old website URL.
-- Saves the original Swift file beside the edited file as a backup.
-
-It does **not** build, install, open the app, access the camera, or upload anything. Read [the helper source](tools/prepare-visible-sclshi.py) if you want to inspect every change.
-
-**Checkpoint:** it prints **Prepared visible controls and startup confirmation**. If it says the source differs, stop rather than forcing the edits. Re-running it on the already prepared source makes no further changes.
-
-## 6. Save your own website address and upload token
-
-First stop an existing Sclshi instance if you have one; see “Stopping” below. Configuration changes should be made while the app is stopped.
-
-Run:
-
-```bash
-cd "$HOME/sclshi-source/cloudflare"
-python3 photo_upload.py --setup
-```
-
-When prompted:
-
-1. For **Website URL**, paste your own HTTPS base URL from Section 1. **Do not press Enter to accept the historical default.** Do not append `/upload` or `/api/photos`.
-2. For **Upload token**, paste your Worker's `UPLOAD_TOKEN` and press Enter. Typing is hidden; that is normal.
-
-`--setup` saves configuration and exits. It does not take a photo. Do not run `photo_upload.py` without that flag just to configure it; its other modes can capture or upload.
-
-Configuration is stored at:
+You will finish with this:
 
 ```text
-~/Pictures/PhotoStream/config.json
+Choose a photo in Sclshi on your Mac
+                 ↓
+Your own Cloudflare website receives it
+                 ↓
+Your own private Supabase bucket stores it
+                 ↓
+Sign in to your website to see the same photo
 ```
 
-The `~` means your home folder. Each macOS account has its own configuration. Set it up while signed into the account that will run Sclshi. Do not post this file online; it contains the upload token.
+The complete app source is in [`starter/macos`](../starter/macos/). This starter-compatible Sclshi has a normal window and Dock icon. You enter your own website address, sign in, and choose which photo to upload. It uses the same account and private library as the website.
 
-To check just the configured address without printing the token:
+**Use this app version for the beginner starter.** The historical Sclshi binary uses a different upload protocol. Merely entering the starter URL into that old binary will not work. You do not need the historical backend, an upload token, the visible-menu preparation helper, or an old branch for this guide.
 
-```bash
-python3 -c 'import json,pathlib; print(json.loads((pathlib.Path.home()/"Pictures/PhotoStream/config.json").read_text())["url"])'
-```
+This version uploads existing photos you select. It does not automatically take camera photos, watch folders, record a microphone, share a screen, or start at login. It accepts JPEG, PNG, and WebP images up to 1,000,000 bytes each, matching the website.
 
-**Checkpoint:** it prints your own gallery's URL, not the deleted original URL and not the new starter website.
+## 1. Finish your website first
 
-## 7. Build and preview without capturing
+Complete Steps 1–12 of the [main README](../README.md). Before building the app, check that you can:
 
-```bash
-cd "$HOME/sclshi-source/cloudflare/menu-bar"
-bash build.sh
-open -n "$PWD/build/Sclshi.app" --args --preview
-```
+1. Open your own `https://...workers.dev` website.
+2. Sign in using the user you created in **Supabase → Authentication → Users**.
+3. Upload a small image using the website.
+4. Sign out and sign in again, and still see that image.
 
-The build produces an Intel/Apple-silicon app and ZIP in `build/`. Preview disables camera capture, uploads, and login registration.
+Save these three things for the app:
 
-In the menu bar, find `$` and click it. Confirm that **Quit Sclshi** is visible. Screen-sharing actions are inactive in preview. Quit the preview before installing.
-
-If you cannot find the item, check any menu-bar hiding utility and available menu-bar space. Do not continue to a capture launch until you can access Quit.
-
-If macOS blocks the ad-hoc signed build, inspect the source and the system's stated reason before deciding whether to approve it through normal macOS controls. Do not disable Gatekeeper or remove system protections to make the guide work.
-
-**Checkpoint:** the preview opens, the menu is visible, and Quit closes it.
-
-## 8. Install the prepared app
-
-Make sure any earlier Sclshi or Photo Stream app is stopped, including preview. Then:
-
-```bash
-cd "$HOME/sclshi-source/cloudflare/menu-bar"
-bash install.sh
-```
-
-The installer builds again and copies the app to:
-
-```text
-~/Applications/Sclshi.app
-```
-
-It also backs up earlier matching app bundles and disables two legacy Photo Stream LaunchAgents. Backups go under `~/Pictures/PhotoStream/setup-backups/`. It leaves your photos and saved configuration in place. Read the script before running it if you use an older installation.
-
-Open the installed app:
-
-```bash
-open "$HOME/Applications/Sclshi.app"
-```
-
-1. Read the startup explanation.
-2. Choose **Start photos** only when you are ready to capture and upload.
-3. Approve the normal macOS camera permission if you agree.
-4. If denied, open **System Settings → Privacy & Security → Camera**, enable Sclshi, and reopen it if macOS requests that.
-5. Check the `$` menu remains accessible.
-
-**Checkpoint:** your compatible gallery shows a new photo after capture and upload finish. Keep local originals. A process appearing in Terminal proves only that it is running, not that an upload succeeded.
-
-## 9. Check running status and troubleshoot
-
-Check the current user's Sclshi process:
-
-```bash
-pgrep -u "$(id -u)" -x Sclshi
-```
-
-A number is a process ID. No output usually means no process with that exact name is running for your account.
-
-Check the last app status:
-
-```bash
-cat "$HOME/Pictures/PhotoStream/app-status.txt"
-```
-
-This is a saved status message, not a live heartbeat. Check its timestamp; a stale file is not proof the app is still running. In the prepared build, hovering over the menu icon also shows status text.
-
-| Problem | Check |
+| App field | What to enter |
 | --- | --- |
-| No photo appears | Camera permission, current process, last status, URL, and matching upload token. |
-| 401 / unauthorized upload | Use the historical Worker's `UPLOAD_TOKEN`, not its admin password or a Supabase key. |
-| 404 / wrong endpoint | The new starter does not implement Sclshi's `/upload` API. Use the compatible backend. |
-| 429 | Historical gallery daily request or transfer budget may be exhausted. Read the server error and its documented limits. |
-| Camera denied | Grant permission in System Settings; a terminal command cannot grant it silently. |
-| Install asks you to quit | Stop the old app first, then rerun the installer. |
-| Compiler / SDK mismatch | Install compatible Apple build tools; do not assume a failed build installed a new app. |
-| Preview is running but no uploads occur | Expected: quit preview and launch the installed app normally when ready. |
-| Config asks for setup again | Use the same macOS account and run the `--setup` command above. |
+| Website address | Your own Cloudflare website's HTTPS base address. |
+| Gallery email | The email you created in Supabase Authentication. |
+| Gallery password | That user's password. |
 
-## 10. Optional screen sharing
+Example website address:
 
-The prepared app does not automatically start screen sharing at launch. Use `$ → Start screen sharing` when you explicitly want it.
-
-macOS may request Screen Recording or Screen & System Audio Recording permission; the label depends on your macOS version. Approve it through System Settings only if you want sharing, then reopen the app if required. System sharing indicators remain visible.
-
-Use the compatible historical gallery's admin **Live screen** page to connect. Use `$ → Stop screen sharing` to stop, or **Quit Sclshi** to stop the whole app. While an explicitly started session is active, sleep pauses it and wake may resume it; selecting Stop clears that resume request.
-
-This guide does not configure remote control, microphone capture, or invisible recording. The browser-only starter has no Live screen page.
-
-## 11. Optional startup at login
-
-The prepared app does not register itself automatically. If you want it to open at login:
-
-1. Open **System Settings → General → Login Items** (sometimes Login Items & Extensions).
-2. Under **Open at Login**, add `Sclshi.app` from your home Applications folder.
-3. Leave the app in that location.
-
-At login, the prepared app still waits for **Start photos** before capturing. Adding a login item does not pre-approve capture. To prevent startup, remove or disable that entry. Upgrading from an older installation may leave an existing login item, so inspect this screen even if you do not want automatic opening.
-
-## 12. Stopping, updating, and uninstalling
-
-### Stop now
-
-Prefer `$ → Quit Sclshi`. If the app is unresponsive or an older installed build has no accessible menu, use **Activity Monitor**, search for Sclshi, select it, and choose Quit.
-
-A terminal fallback for your own account is:
-
-```bash
-pkill -TERM -u "$(id -u)" -x Sclshi
+```text
+https://mia-photo-garden.my-account.workers.dev
 ```
 
-Then run the `pgrep` check above again. This stops all processes named Sclshi for your current account, including previews. Disable its login item if you do not want it opening at the next login.
+Use your real address, not that example. **Do not use the Supabase project URL here.** Sclshi talks to your website; your website connects to Supabase.
 
-### Update carefully
+You never put a Supabase secret, publishable key, database password, or Cloudflare token into the app. Those are not your gallery sign-in credentials.
 
-Do not blindly `git pull` and assume these preparation changes are still present. They are local changes against the pinned revision. For a different version, review its controls and behavior first, rebuild, test preview, stop the old app, and only then install. This guide does not configure automatic updates.
+**Checkpoint:** your website works by itself. If the browser cannot sign in or upload, fix that first using the README's troubleshooting table.
 
-### Uninstall
+## 2. Check your Mac
 
-1. Quit Sclshi and confirm it is no longer running.
-2. Remove it from Login Items.
-3. In Finder, use **Go → Go to Folder** and enter `~/Applications`.
-4. Move **Sclshi.app** to the Trash.
-5. Inspect any legacy Photo Stream startup items and remove only those you recognize.
-6. Keep `~/Pictures/PhotoStream` if you want your local originals and receipts. It also contains the upload token. Back up needed photos and deliberately remove credentials/data separately if you no longer need them.
-7. Remove unneeded camera/screen permissions through System Settings.
+You need macOS 13 or later on Intel or Apple silicon. Check **Apple menu → About This Mac**.
 
-Uninstalling the Mac app does not delete uploaded media or your website. Deleting a website does not uninstall the Mac app.
+This app is macOS-only. People using Windows, phones, or tablets can upload through the website in their browser.
 
-## Validation boundary
+Open Terminal with Command–Space → type **Terminal** → Enter. Run:
 
-The preparation helper is checked against the pinned source, and the prepared app is compiled before this guide is published. This is not an end-to-end test of your camera, permissions, account, or deployed server. Use preview first, then perform one explicitly approved capture and confirm its upload on your own Mac.
+```bash
+xcode-select --install
+```
+
+Finish Apple's Command Line Tools installer. If the tools are already installed, that message is fine. Then run:
+
+```bash
+xcrun --find swiftc
+/usr/bin/python3 --version
+```
+
+The first command finds Apple's Swift compiler. The second checks the Python included with the build tools; the build uses it to create the app's metadata. Both commands should print a path or version.
+
+**Checkpoint:** both commands succeed. Node.js is needed to deploy the website, but the native app itself does not need Node.js running.
+
+## 3. Open the right source folder
+
+If you already downloaded this repository for the website, use that copy. It must contain:
+
+```text
+starter/macos/Sclshi.swift
+starter/macos/build.sh
+```
+
+If those files are missing, download a fresh ZIP from the repository's **main** branch: [GitHub → Code → Download ZIP](https://github.com/GRose18/mac-photo-stream). Extract it first. Do not use `codex/durable-photo-storage` for this app.
+
+In Terminal:
+
+1. Type `cd `, including the space.
+2. Drag the extracted **starter/macos** folder from Finder into Terminal.
+3. Press Enter.
+4. Run:
+
+   ```bash
+   ls
+   ```
+
+**Checkpoint:** the output includes `Sclshi.swift` and `build.sh`.
+
+## 4. Build Sclshi
+
+Run from `starter/macos`:
+
+```bash
+bash build.sh
+```
+
+Wait for it to finish. The first build may take several minutes. It compiles an app that supports both Intel and Apple silicon, assembles it, and checks its ad-hoc signature.
+
+**Checkpoint:** it prints a line beginning **Built app:**. The new files are:
+
+```text
+starter/macos/build/Sclshi.app
+starter/macos/build/Sclshi.zip
+```
+
+The script does not install or launch the app, upload photos, or contact your gallery.
+
+If you see a compiler or SDK error, the build did not succeed. Check your Apple Command Line Tools installation. If you deliberately use a different compatible SDK, `SCLSHI_SDK` can select its absolute path; most readers should leave it unset.
+
+## 5. Personalize the app's name
+
+The default display name is **Sclshi**. To call it something of your own, rebuild with a display name:
+
+```bash
+SCLSHI_APP_NAME="Mia's Photo Garden" bash build.sh
+```
+
+This changes the app's window title, heading, application-menu Quit label, and bundle display name. The output folder remains `build/Sclshi.app` so the instructions and scripts still have a predictable path. Finder may show the bundle filename; after installation you can rename the `.app` in Finder if you wish.
+
+The website's name and colors are separate. Change those in `starter/public/index.html` and `starter/public/style.css` as explained in the README, then deploy the website again.
+
+**Your website address is entered in the app at runtime.** You do not need to edit Swift code or rebuild the app just to connect it to a different website.
+
+## 6. Install it on your computer
+
+1. Stop any older Sclshi app first. If necessary, open **Activity Monitor**, search for Sclshi, and quit the old process. Remove an old capture app from Login Items if you no longer want it opening.
+2. In Finder, open `starter/macos/build`.
+3. Open a second Finder window. Choose **Go → Go to Folder** and enter `~/Applications`.
+4. If that folder does not exist, create an **Applications** folder inside your home folder.
+5. Drag `Sclshi.app` from `build` into that Applications folder. If you want to retain the build output, copy/paste it instead.
+6. If an app with the same name already exists, keep a backup or give the new one a distinct name instead of blindly replacing the old app.
+7. Open the installed app.
+
+This is a source-built, ad-hoc signed app, not a notarized App Store download. If macOS blocks it, inspect the app's source and the system message, then use normal **Privacy & Security → Open Anyway** approval only if you trust what you built. Do not disable Gatekeeper. Organizations may have policies that prevent unnotarized apps from opening.
+
+**Checkpoint:** a normal window appears with Website address, Gallery email, Gallery password, and Sign in. There is a Dock icon. This version does not rely on a hidden menu-bar widget.
+
+## 7. Connect the app to your own website
+
+In the app:
+
+1. Enter your website's full HTTPS base address, for example:
+
+   ```text
+   https://mia-photo-garden.my-account.workers.dev
+   ```
+
+2. Do not append `/api/login`, `/api/photos`, `/upload`, or a sign-in page path.
+3. Enter your gallery user's email.
+4. Enter that user's password.
+5. Click **Sign in**.
+
+Only enter an address you control and trust: the app sends your sign-in credentials to that website. The address is locked while signed in, so an upload cannot accidentally be sent to a different site by editing the field.
+
+**Checkpoint:** the app says **Signed in** and enables **Choose and upload a photo…**.
+
+The app remembers the website address on this Mac. It does not save your password or session token to disk. Closing it or expiration of the Supabase access token requires signing in again.
+
+To switch websites, click **Sign out**, enter the other website's address, then sign in using an account belonging to that site. No rebuild is required.
+
+## 8. Upload a photo from Sclshi
+
+1. Click **Choose and upload a photo…**.
+2. Select one JPEG, PNG, or WebP on your computer. It must be no larger than 1,000,000 bytes.
+3. Click **Upload this photo** in the file chooser. That button confirms the upload; cancelling uploads nothing.
+4. Wait for the app's **Uploaded [filename]** message.
+5. Click **Open my website**.
+6. Sign in on the website with the **same account** you used in the app. Browser and app sessions are separate.
+7. Click **Refresh photos**. Use **Load more** if needed; the starter sorts by generated filename, not newest first.
+
+**Checkpoint:** the app's photo appears in the browser gallery. In Supabase Storage, it appears under that user's ID folder inside `gallery`.
+
+The app copies the image to the server; it does not remove the original. Keep your original backup. If an upload times out, check the gallery before trying again: retrying creates a new upload and may duplicate a file that already arrived.
+
+If your photo is HEIC, export it as JPEG first. On Mac, open it in Preview and use **File → Export**. Adjust quality or image dimensions until it is below 1 MB. Renaming `.heic` to `.jpg` does not convert it.
+
+## 9. Permissions and stopping
+
+The app uses the standard file chooser. If macOS asks to access the selected folder, approve only if you want to upload that file. It does not need camera, microphone, screen-recording, or Full Disk Access permission.
+
+To stop it, close its window or choose **Quit** from its application menu (Command–Q). Closing the last window quits the app and cancels outstanding network tasks. A file that already reached the server may still exist after cancellation; check the website before retrying.
+
+**Sign out** clears the app's local session. Like the browser starter, it does not revoke an already copied access token. It does not affect another signed-in browser window.
+
+Sclshi does not install a login item or background uploader. If you manually add it to Login Items, it still waits for you to sign in and select a file.
+
+## 10. Help other people create their own version
+
+To share the creation, send people:
+
+- The [main setup README](../README.md) for their own Cloudflare and Supabase accounts.
+- This app guide for building and naming Sclshi, entering their own website URL, and uploading their photos.
+- The [`starter`](../starter/) folder, which includes both the website and native app source.
+
+They should create their **own project, bucket, website, and sign-in**. Do not send them your dashboard passwords, personal app configuration, Supabase secret keys, or gallery password.
+
+If you instead want someone to use your website, create a confirmed Supabase user for them in your project and give them your website address. Their user gets its own private library. Creating their account does not give them your photos.
+
+`build/Sclshi.zip` contains the app, but the easiest reproducible route for developers is to share the source and let them build it. A binary you distribute is still ad-hoc signed; building an app is not the same as Developer ID signing and notarizing it for general distribution. A fresh install does not contain your website password or session.
+
+## Troubleshooting
+
+| Symptom | What to check |
+| --- | --- |
+| The old app has no normal window | Build and install **`starter/macos` from `main`**, not the historical app branch. |
+| The website address is rejected | Use an HTTPS base URL without credentials, query strings, fragments, or API paths. |
+| Sign-in fails | Use the same email/password that work in your beginner website. Confirm the user in Supabase Authentication. |
+| App says the session ended | Sign in again; this starter does not automatically refresh tokens. |
+| 404 or no sign-in token | The URL may be an old gallery, Supabase project URL, or unrelated site. Use your deployed beginner Worker. |
+| Photo is too large | Export/resize below 1,000,000 bytes. |
+| Storage access denied | Check the README's two Supabase policies and matching `gallery` bucket. |
+| Upload works but gallery looks empty | Sign into the same user, refresh, and use Load more. Different users have different libraries. |
+| Network timeout | Check the gallery before retrying to avoid duplicates, then check connection/project status. |
+| Wrong site remembered | Sign out and change Website address. |
+| Build fails | Check macOS version and Apple Command Line Tools; do not run a stale app assuming the build succeeded. |
+
+## Uninstall
+
+Quit the app, then move its `.app` bundle to the Trash. Remove any login item you added yourself. Your original files, website, and uploaded photos remain separate; uninstalling does not delete them. The saved website address is a local macOS preference, not a credential.
+
+## For readers who want to edit the code
+
+- [`Sclshi.swift`](../starter/macos/Sclshi.swift): app window, website validation, sign-in, file selection, and uploads.
+- [`build.sh`](../starter/macos/build.sh): compilation, display-name setting, app metadata, signature check, and ZIP packaging.
+- [`worker.mjs`](../starter/worker.mjs): the exact server API the native app and website both use.
+
+The native app sends `POST /api/login` with email/password, then `POST /api/photos` with the selected image and the returned user's bearer token. The Worker verifies the user with Supabase and writes into that user's folder. No privileged Supabase credential is embedded in the app.
+
+The app is compiled for Intel and Apple silicon before publication. Automated server tests cover authentication and upload isolation; `bash test.sh` in `starter/macos` checks the native client’s URLs, login/upload requests, bearer token, and expired-session handling using a simulated network. We do not capture or upload your personal photos to test a README. Verify your own account and deployment with the explicit upload in Section 8.
