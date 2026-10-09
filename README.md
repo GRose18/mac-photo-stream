@@ -13,6 +13,12 @@ This beginner starter is a **new, simpler gallery**, not the old Sclshi capture 
 
 **The original hosted Photo Stream website was deleted. These instructions create a new website in your own accounts.** The old implementation is documented separately in [the historical guide](docs/legacy-gallery.md).
 
+## Looking for the Sclshi Mac app?
+
+Use the separate **[Sclshi installation and setup guide](docs/sclshi-macos.md)** for prerequisites, visible controls, app installation, your own server URL/token, macOS permissions, status checks, stopping, login items, and uninstalling.
+
+**Compatibility matters:** Sclshi uses the historical gallery server, not the new `starter/` website below. The app guide includes a required preparation step because the published historical source hides its menu; it restores accessible controls and a startup consent prompt before installation.
+
 ## The two services, in plain English
 
 Think of your website as a small photo shop:
